@@ -1,0 +1,96 @@
+# ── Secrets — NEVER commit these ─────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+
+# ── Python ───────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+*.so
+.eggs/
+develop-eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ── Virtual environments ─────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Data (too large for git) ─────────────────────────────────
+*.parquet
+*.csv
+*.h5
+*.hdf5
+*.feather
+*.arrow
+*.db
+*.sqlite3
+/tmp/
+C:/tmp/maestro_data/
+C:/tmp/maestro_models/
+C:/tmp/maestro_outputs/
+
+# ── Models & artifacts ───────────────────────────────────────
+*.pt
+*.pth
+*.onnx
+*.pkl
+*.joblib
+*.safetensors
+mlruns/
+mlartifacts/
+
+# ── Jupyter / Notebooks ─────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# ── Testing & coverage ──────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# ── Type checking & linting ─────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# ── IDE / Editor ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.claude/
+
+# ── OS files ─────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# ── Logs & output ────────────────────────────────────────────
+*.log
+logs/
+
+# ── Docker ───────────────────────────────────────────────────
+docker-compose.override.yml
+
+# ── AWS ──────────────────────────────────────────────────────
+.aws/

@@ -1,0 +1,133 @@
+# ============================================================
+# MAESTRO — Master Configuration
+# ============================================================
+# All secrets loaded from environment variables — never hardcode keys here.
+
+project:
+  name: "MAESTRO"
+  version: "1.0.0"
+  environment: "development"          # development | staging | production
+  log_level: "INFO"
+  timezone: "UTC"
+
+# ── Markets ──────────────────────────────────────────────────
+markets:
+  instruments:
+    - id: "EUR_USD"
+      display: "EUR/USD"
+      pip_size: 0.0001
+      min_units: 1
+      max_units: 10_000_000
+    - id: "GBP_USD"
+      display: "GBP/USD"
+      pip_size: 0.0001
+      min_units: 1
+      max_units: 10_000_000
+
+  granularities:
+    tick:    "S5"      # 5-second (finest OANDA granularity)
+    intraday: "M5"     # 5-minute primary
+    hourly:   "H1"
+    daily:    "D"
+
+  sessions:                           # Active trading hours (UTC)
+    london_open:  "07:00"
+    new_york_open: "12:00"
+    overlap_close: "16:00"
+    primary_trade_time: "12:15"       # Trade at London/NY overlap
+
+# ── Data Sources ─────────────────────────────────────────────
+data_sources:
+  oanda:
+    base_url: "https://api-fxpractice.oanda.com"   # practice; swap for live
+    account_env_var: "OANDA_ACCOUNT_ID"
+    token_env_var: "OANDA_API_KEY"
+    max_candles_per_request: 5000
+    retry_attempts: 3
+    retry_backoff_seconds: 2.0
+
+  fred:
+    base_url: "https://api.stlouisfed.org/fred"
+    token_env_var: "FRED_API_KEY"
+    series:
+      - id: "DFF"          # Fed Funds Rate
+      - id: "T10Y2Y"       # 10Y-2Y Yield Curve
+      - id: "VIXCLS"       # CBOE VIX
+      - id: "CPIAUCSL"     # CPI (inflation)
+      - id: "UNRATE"       # Unemployment Rate
+      - id: "DEXUSEU"      # USD/EUR exchange (cross-check)
+      - id: "DEXUSUK"      # USD/GBP exchange (cross-check)
+
+  newsapi:
+    base_url: "https://newsapi.org/v2"
+    token_env_var: "NEWS_API_KEY"
+    queries:
+      - "EUR USD forex central bank"
+      - "GBP USD Bank of England"
+      - "Federal Reserve interest rates"
+      - "ECB European Central Bank"
+    page_size: 100
+    lookback_days: 30
+
+# ── Database ─────────────────────────────────────────────────
+database:
+  host_env_var: "DB_HOST"
+  port: 5432
+  name: "maestro"
+  user_env_var: "DB_USER"
+  password_env_var: "DB_PASSWORD"
+  pool_size: 10
+  max_overflow: 20
+
+  tables:
+    ohlcv:     "ohlcv_data"
+    macro:     "macro_data"
+    news:      "news_data"
+    features:  "features"
+    regimes:   "regime_labels"
+    signals:   "agent_signals"
+    trades:    "trade_log"
+    audit:     "audit_log"
+
+# ── AWS ──────────────────────────────────────────────────────
+aws:
+  region: "eu-west-2"
+  s3_bucket_env_var: "AWS_S3_BUCKET"
+  s3_prefix: "maestro/data"
+  ec2_instance_type: "t3.medium"       # bump to p3.2xlarge for GPU training
+
+# ── Feature Engineering ──────────────────────────────────────
+features:
+  sma_windows:       [10, 20, 50, 100, 200]
+  ema_windows:       [12, 26, 50]
+  rsi_period:        14
+  atr_period:        14
+  bb_period:         20
+  bb_std:            2.0
+  macd_fast:         12
+  macd_slow:         26
+  macd_signal:       9
+  vol_lookback:      20                 # realized volatility window (days)
+  return_lags:       [1, 2, 3, 5, 10]  # lagged return features
+
+# ── Walk-Forward Validation ───────────────────────────────────
+validation:
+  train_start:       "2000-01-01"
+  train_end:         "2015-12-31"
+  wfa_start:         "2016-01-01"
+  wfa_end:           "2023-12-31"
+  wfa_step_months:   1                  # expand by 1 month each step
+  embargo_days:      5                  # purging gap between train/test
+  n_splits_cpcv:     6                  # Combinatorial Purged CV splits
+  min_samples_train: 500
+
+# ── Risk Limits ───────────────────────────────────────────────
+risk:
+  max_drawdown_pct:      0.15           # 15% hard stop
+  circuit_breaker_pct:   0.10           # 10% → pause trading
+  max_position_units:    100_000
+  var_confidence:        0.95
+  cvar_confidence:       0.99
+  kelly_fraction:        0.25           # fractional Kelly (25%)
+  max_daily_loss_pct:    0.03           # 3% max daily loss
+  spread_buffer_pips:    1.5            # minimum edge needed vs spread
