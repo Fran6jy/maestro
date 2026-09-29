@@ -1,0 +1,330 @@
+/* MAESTRO — one deliberate dark, institutional theme.
+   Layout: full-bleed bands, content on a 1200px measure, one bold moment per section.
+   Accent is terminal amber (the trading desk), charts pair warm "before costs"
+   with cool "after costs" so the comparison survives colour-blindness. */
+
+:root {
+  --bg: #07090c;
+  --bg-2: #0a0e13;
+  --panel: #0e131a;
+  --panel-2: #131a23;
+  --line: #1a212b;
+  --line-2: #27303c;
+  --ink: #edf1f5;
+  --ink-2: #a3adba;
+  --ink-3: #69737f;
+
+  --amber: #ffb547;
+  --amber-2: #ff9a2e;
+  --amber-soft: rgba(255, 181, 71, 0.14);
+  --cool: #8db4ff;
+  --cool-soft: rgba(141, 180, 255, 0.14);
+  --cost: #ff6b5b;
+  --cost-soft: rgba(255, 107, 91, 0.13);
+  --gain: #39d98a;
+  --loss: #ff6b5b;
+
+  --measure: 1200px;
+  --gutter: clamp(18px, 4vw, 40px);
+  --radius: 14px;
+  --radius-sm: 8px;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.1875rem;
+  --fs-xl: clamp(1.5rem, 2.4vw, 2rem);
+  --fs-2xl: clamp(2.25rem, 4.6vw, 3.75rem);
+  --fs-hero: clamp(3.1rem, 8.4vw, 7.25rem);
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body), "IBM Plex Sans", system-ui, sans-serif;
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+svg,
+canvas {
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-weight: 620;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--amber);
+  color: #0a0a0a;
+}
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.mono,
+.num {
+  font-family: var(--font-mono), "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.shell {
+  width: 100%;
+  max-width: calc(var(--measure) + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+.band {
+  padding-block: clamp(88px, 12vw, 160px);
+  position: relative;
+}
+
+.band + .band {
+  border-top: 1px solid var(--line);
+}
+
+.band-head {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 46rem;
+  margin-bottom: clamp(36px, 5vw, 56px);
+}
+
+.band-head h2 {
+  font-size: var(--fs-2xl);
+  font-stretch: 80%;
+  line-height: 1;
+}
+
+.lede {
+  font-size: var(--fs-lg);
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 40rem;
+}
+
+.lede strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding-inline: 20px;
+  border-radius: 999px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--amber);
+  color: #121008;
+}
+
+.btn-primary:hover {
+  background: #ffc369;
+}
+
+.btn-ghost {
+  border-color: var(--line-2);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.btn-ghost:hover {
+  border-color: var(--ink-3);
+}
+
+.btn .arrow {
+  transition: transform 0.2s ease;
+}
+
+.btn:hover .arrow {
+  transform: translateX(3px);
+}
+
+/* ── Status pills ────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding-inline: 10px;
+  border-radius: 999px;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pill-done {
+  color: var(--gain);
+  background: rgba(57, 217, 138, 0.1);
+}
+
+.pill-next {
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+.pill-plan {
+  color: var(--ink-2);
+  border: 1px solid var(--line-2);
+}
+
+.pill-later {
+  color: var(--ink-3);
+  border: 1px dashed var(--line-2);
+}
+
+/* ── Panels ──────────────────────────────────────────── */
+.panel {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  position: relative;
+}
+
+.panel-glow::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(140deg, rgba(255, 181, 71, 0.35), transparent 30%, transparent 70%, rgba(141, 180, 255, 0.22));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  padding: 1px;
+}
+
+/* ── Scroll reveal (progressive: only where scroll-driven animation exists) ── */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: reveal-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 22%;
+    }
+  }
+}
+
+@keyframes reveal-in {
+  from {
+    opacity: 0.15;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.skip {
+  position: fixed;
+  left: 16px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--amber);
+  color: #121008;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.skip:focus {
+  top: 16px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
