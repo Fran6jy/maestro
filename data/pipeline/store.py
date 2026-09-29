@@ -57,8 +57,9 @@ OANDA_URL = os.environ.get("OANDA_BASE_URL", "https://api-fxpractice.oanda.com")
 
 
 def secret(name: str) -> str:
-    """An API key from the environment, without stray whitespace or quotes from pasting."""
-    return os.environ[name].strip().strip("\"'")
+    """An API key from the environment, without the stray whitespace, quotes or byte-order
+    mark that pasting or a Windows PowerShell pipe can add."""
+    return os.environ[name].strip().strip("\"'\ufeff").strip()
 
 
 def _atomic_parquet(df: pd.DataFrame, path: Path) -> None:
