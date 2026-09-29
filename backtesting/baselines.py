@@ -34,6 +34,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -271,6 +272,50 @@ def make_wfa(close: pd.Series):
     )
 
 
+@dataclass
+class RefitBlock:
+    """A group of consecutive monthly test windows that share one trained model."""
+    block_id: int
+    train_idx: pd.Index
+    splits: list          # WFASplit objects, one per monthly test window
+
+    @property
+    def test_idx(self) -> pd.Index:
+        return self.splits[0].test_idx.append([s.test_idx for s in self.splits[1:]])
+
+
+def design_tag(refit_months: int, train_months: int | None) -> str:
+    """Folder-safe name of a retraining design, e.g. 'refit1_expanding' or 'refit3_roll12'."""
+    return f"refit{refit_months}_" + ("expanding" if train_months is None else f"roll{train_months}")
+
+
+def refit_plan(close: pd.Series, refit_months: int = 1, train_months: int | None = None,
+               max_splits: int | None = None) -> list[RefitBlock]:
+    """
+    Group the monthly walk-forward test windows into retraining blocks.
+
+    refit_months=1, train_months=None  -> the original design: retrain before every
+                                          month on all data so far (expanding window).
+    refit_months=3, train_months=12    -> retrain every quarter on the latest 12 months.
+                                          Every month is still traded blind.
+
+    The training window always ends `embargo_days` before the block's first test month,
+    so months two and three of a block are even further out of sample.
+    """
+    splits = [s for s in make_wfa(close).splits(close.to_frame()) if len(s.train_idx) >= 500]
+    if max_splits is not None:
+        splits = [s for s in splits if s.split_id < max_splits]
+    blocks = []
+    for b, start in enumerate(range(0, len(splits), refit_months)):
+        group = splits[start:start + refit_months]
+        train_idx = group[0].train_idx
+        if train_months is not None:
+            cutoff = group[0].test_start - pd.DateOffset(months=train_months)
+            train_idx = train_idx[train_idx >= cutoff]
+        blocks.append(RefitBlock(b, train_idx, group))
+    return blocks
+
+
 def default_cost_scenarios(instrument: str) -> dict[str, float]:
     """Round-trip costs in pips. 'spread' reuses the shared cost model's typical spread."""
     from maestro.agents.risk.cost_model import INSTRUMENT_COSTS
@@ -279,33 +324,49 @@ def default_cost_scenarios(instrument: str) -> dict[str, float]:
 
 
 def run(instrument: str = "EUR_USD", max_splits: int | None = None,
-        strategies: list[str] | None = None, out_dir: Path | None = None
+        strategies: list[str] | None = None, out_dir: Path | None = None,
+        refit_months: int = 1, train_months: int | None = None,
+        external: dict[str, pd.Series] | None = None,
         ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Score strategies over the walk-forward test months.
+
+    external : optional {name: position series} produced elsewhere (e.g. MAESTRO),
+               covering the test bars. They are scored with exactly the same
+               simulate/summarise code as the built-in strategies.
+    """
     pip = PIP_SIZE[instrument]
     close = load_close(instrument)
     returns = np.log(close / close.shift(1))
-    names = strategies or list(STRATEGIES)
+    names = list(strategies or STRATEGIES)
+    external = external or {}
+    all_names = names + list(external)
     costs = default_cost_scenarios(instrument)
+    blocks = refit_plan(close, refit_months, train_months, max_splits)
 
-    windows: dict[str, list[WindowResult]] = {n: [] for n in names}
+    windows: dict[str, list[WindowResult]] = {n: [] for n in all_names}
     split_rows = []
-    for split in make_wfa(close).splits(close.to_frame()):
-        if max_splits is not None and split.split_id >= max_splits:
-            break
-        if len(split.train_idx) < 500:
-            continue
-        for name in names:
-            pos = STRATEGIES[name](close, returns, split.train_idx, split.test_idx, split.split_id)
-            res = simulate(pos, close, pip)
-            windows[name].append(res)
-            s = summarise([res], cost_pips=costs["spread"], pip=pip)
-            split_rows.append({"split_id": split.split_id, "strategy": name,
-                               "test_start": split.test_start, "test_end": split.test_end, **s})
-        logger.info("split %d done (%s -> %s)", split.split_id,
-                    split.test_start.date(), split.test_end.date())
+    for block in blocks:
+        # Each built-in strategy is fitted once per block, then traded month by month.
+        block_pos = {n: STRATEGIES[n](close, returns, block.train_idx, block.test_idx, block.block_id)
+                     for n in names}
+        for split in block.splits:
+            for name in all_names:
+                src = block_pos[name] if name in block_pos else external[name]
+                pos = src.reindex(split.test_idx).fillna(0.0)
+                res = simulate(pos, close, pip)
+                windows[name].append(res)
+                s = summarise([res], cost_pips=costs["spread"], pip=pip)
+                split_rows.append({"split_id": split.split_id, "block_id": block.block_id,
+                                   "strategy": name, "test_start": split.test_start,
+                                   "test_end": split.test_end, **s})
+        logger.info("block %d done: %d month(s) from %s, trained on %d bars",
+                    block.block_id, len(block.splits), block.splits[0].test_start.date(),
+                    len(block.train_idx))
 
     pooled_rows = []
     per_split = pd.DataFrame(split_rows)
+    names = all_names
     for name in names:
         for label, c in costs.items():
             s = summarise(windows[name], cost_pips=c, pip=pip)
@@ -315,8 +376,12 @@ def run(instrument: str = "EUR_USD", max_splits: int | None = None,
             row["splits_profitable_at_spread"] = f"{int((net > 0).sum())}/{len(net)}"
     pooled = pd.DataFrame(pooled_rows)
 
-    out = (out_dir or OUTPUT_DIR / "baselines")
+    out = out_dir or OUTPUT_DIR / "baselines" / design_tag(refit_months, train_months)
     out.mkdir(parents=True, exist_ok=True)
+    (out / "design.json").write_text(json.dumps({
+        "instrument": instrument, "refit_months": refit_months, "train_months": train_months,
+        "blocks": len(blocks), "months": int(per_split["split_id"].nunique()),
+    }, indent=2), encoding="utf-8")
     pooled.to_csv(out / f"{instrument}_baselines_pooled.csv", index=False)
     per_split.to_csv(out / f"{instrument}_baselines_per_split.csv", index=False)
     daily = pd.DataFrame({
@@ -351,8 +416,13 @@ def main() -> None:
     p.add_argument("--instrument", default="EUR_USD")
     p.add_argument("--max-splits", type=int, default=None)
     p.add_argument("--strategies", nargs="+", default=None, choices=list(STRATEGIES))
+    p.add_argument("--refit-months", type=int, default=1,
+                   help="retrain every N test months (default 1)")
+    p.add_argument("--train-months", type=int, default=None,
+                   help="rolling training window in months (default: all history)")
     args = p.parse_args()
-    pooled, per_split = run(args.instrument, args.max_splits, args.strategies)
+    pooled, per_split = run(args.instrument, args.max_splits, args.strategies,
+                            refit_months=args.refit_months, train_months=args.train_months)
     _print_report(pooled, per_split["split_id"].nunique())
 
 

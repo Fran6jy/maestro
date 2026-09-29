@@ -296,6 +296,10 @@ class TFTSignalModel:
         self.model   = None
         self.scaler_past   = StandardScaler()
         self.scaler_future = StandardScaler()
+        # Std of the cumulative k-bar return in training, per step k. Targets are
+        # divided by it so the network works in unit-variance space; raw 5-minute
+        # returns (~1e-4) let it cut the loss fastest by ignoring its inputs.
+        self.target_scale  = np.ones(self.cfg.pred_len, dtype=np.float32)
         self.fitted  = False
         self._n_past   = len(PAST_FEATURES)
         self._n_future = len(FUTURE_FEATURES)
@@ -331,6 +335,8 @@ class TFTSignalModel:
         past_arr, fut_arr, static_arr, reg_arr, target_arr = self._prepare(
             df, regimes, instrument, fit_scalers=True
         )
+        self.target_scale = np.maximum(target_arr.std(axis=0), 1e-8).astype(np.float32)
+        target_arr = target_arr / self.target_scale
 
         TFTModule = _TFTModule.get()
         self.model = TFTModule(
@@ -364,7 +370,7 @@ class TFTSignalModel:
                 vp, vf, vs, vr, vt = self._prepare(
                     val_df, val_regimes, instrument, fit_scalers=False
                 )
-                val_loss = self._run_epoch(vp, vf, vs, vr, vt, None, training=False)
+                val_loss = self._run_epoch(vp, vf, vs, vr, vt / self.target_scale, None, training=False)
                 scheduler.step(val_loss)
                 monitor = val_loss
             else:
@@ -438,7 +444,7 @@ class TFTSignalModel:
                 r      = torch.tensor(reg_arr[start:end],    dtype=torch.long).to(self.cfg.device)
 
                 preds, attn = self.model(p, f, s, r)   # (B, pred_len, Q), (B, pred_len, T)
-                all_preds[start:end] = preds.cpu().numpy()
+                all_preds[start:end] = preds.cpu().numpy() * self.target_scale[None, :, None]
 
                 # Attention entropy (lower = more focused = more confident)
                 attn_np = attn.cpu().numpy()
@@ -446,15 +452,17 @@ class TFTSignalModel:
                 entropy = -(attn_np * np.log(attn_np + eps)).sum(axis=-1).mean(axis=-1)
                 all_attn_entropy[start:end] = entropy
 
-        # Build output DataFrame
-        # n = len(df) - seq_len - pred_len + 1 (windows that have full future horizon)
-        result = pd.DataFrame(index=df.index[self.cfg.seq_len : self.cfg.seq_len + n])
-        for h_idx, h in enumerate(HORIZONS):
-            if h_idx >= self.cfg.pred_len:
+        # Build output DataFrame. Window i ends at bar i + seq_len - 1: that is the
+        # bar the forecast is made at (its close is the last thing the model saw),
+        # so the forecast is labelled there. Step k is the cumulative return over
+        # the next k + 1 bars, so horizon h is step h - 1.
+        result = pd.DataFrame(index=df.index[self.cfg.seq_len - 1 : self.cfg.seq_len - 1 + n])
+        for h in HORIZONS:
+            if h > self.cfg.pred_len:
                 break
-            p10 = all_preds[:, h_idx, 0]
-            p50 = all_preds[:, h_idx, 1]
-            p90 = all_preds[:, h_idx, 2]
+            p10 = all_preds[:, h - 1, 0]
+            p50 = all_preds[:, h - 1, 1]
+            p90 = all_preds[:, h - 1, 2]
 
             # Directional confidence (scale-invariant) derived from the quantile
             # forecast. Under a normal approximation P90-P10 ≈ 2.5631·σ, so
@@ -528,7 +536,7 @@ class TFTSignalModel:
         fut_arr    : (n_samples, pred_len, n_future_features)
         static_arr : (n_samples, n_static)
         reg_arr    : (n_samples,) — regime integer for embedding
-        target_arr : (n_samples, pred_len) — future log-returns
+        target_arr : (n_samples, pred_len) — cumulative future log-return over 1..pred_len bars
         """
         # Extract feature matrices
         past_df   = _extract_cols(df, PAST_FEATURES)
@@ -562,7 +570,7 @@ class TFTSignalModel:
             fut_seqs[i]    = future_mat[t_end:f_end]
             static_seqs[i] = [instrument, reg_arr_full[t_end - 1]]
             reg_seqs[i]    = reg_arr_full[t_end - 1]
-            target_seqs[i] = returns[t_end:f_end]
+            target_seqs[i] = np.cumsum(returns[t_end:f_end])
 
         return past_seqs, fut_seqs, static_seqs, reg_seqs, target_seqs
 
@@ -619,6 +627,7 @@ class TFTSignalModel:
             "config":         self.cfg,
             "n_past":         self._n_past,
             "n_future":       self._n_future,
+            "target_scale":   self.target_scale,
         }, path)
         logger.info("TFT saved → %s", path)
 
@@ -640,6 +649,7 @@ class TFTSignalModel:
         obj.model.to(obj.cfg.device)
         obj.scaler_past   = data["scaler_past"]
         obj.scaler_future = data["scaler_future"]
+        obj.target_scale  = data.get("target_scale", np.ones(obj.cfg.pred_len, dtype=np.float32))
         obj.fitted = True
         logger.info("TFT loaded from %s (device=%s)", path, obj.cfg.device)
         return obj

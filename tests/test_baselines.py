@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from maestro.backtesting.baselines import STRATEGIES, simulate, summarise
+from maestro.backtesting.baselines import STRATEGIES, refit_plan, simulate, summarise
 
 PIP = 1e-4
 
@@ -80,3 +80,56 @@ def test_ml_baselines_only_learn_from_train(name):
     assert pos.index.equals(idx[n_train:])
     s = summarise([simulate(pos, close, PIP)], cost_pips=0.0, pip=PIP)
     assert s["hit_directional"] < 0.9
+
+
+def _hourly_close(years: int = 3) -> pd.Series:
+    rng = np.random.default_rng(7)
+    idx = pd.date_range("2022-01-03", periods=years * 365 * 24, freq="h", tz="UTC")
+    return pd.Series(1.1 + np.cumsum(rng.normal(0, 1e-4, len(idx))), index=idx)
+
+
+@pytest.mark.parametrize("refit, train", [(1, None), (3, 12)])
+def test_refit_plan_never_trains_on_its_test_months(refit, train):
+    close = _hourly_close()
+    blocks = refit_plan(close, refit_months=refit, train_months=train)
+    months = [s for b in blocks for s in b.splits]
+    assert [s.split_id for s in months] == sorted({s.split_id for s in months})   # each month once
+    for b in blocks:
+        first_test = b.splits[0].test_start
+        assert b.train_idx.max() <= first_test - pd.Timedelta(days=5)             # embargo respected
+        assert len(b.splits) <= refit
+        if train is not None:
+            assert b.train_idx.min() >= first_test - pd.DateOffset(months=train)  # rolling window
+
+
+def test_refit_plan_covers_the_same_months_under_both_designs():
+    close = _hourly_close()
+    monthly = [s.split_id for b in refit_plan(close, 1, None) for s in b.splits]
+    quarterly = [s.split_id for b in refit_plan(close, 3, 12) for s in b.splits]
+    assert monthly == quarterly
+
+
+def test_maestro_positions_gate_and_carry_through_unscorable_bars():
+    from maestro.backtesting.maestro_runner import MAX_CARRY_BARS, positions
+    bars = pd.date_range("2024-01-01", periods=40, freq="5min", tz="UTC")
+    scored = bars.delete([3] + list(range(10, 10 + MAX_CARRY_BARS + 2)))   # one short gap, one long
+    signals = pd.DataFrame({"signal": 1, "confidence": 0.9, "regime": 2}, index=scored)
+    signals.loc[bars[5], "confidence"] = 0.50                              # below the regime-2 threshold
+    pos = positions(signals, bars)
+    assert pos["maestro_ungated"].index.equals(bars)
+    assert pos["maestro_ungated"][bars[3]] == 1.0                          # short gap: decision carried
+    assert pos["maestro_gated"][bars[5]] == 0.0 and pos["maestro_ungated"][bars[5]] == 1.0
+    assert pos["maestro_ungated"][bars[10 + MAX_CARRY_BARS]] == 0.0         # long gap: goes flat
+
+
+def test_maestro_top10_cutoff_uses_only_earlier_bars():
+    from maestro.backtesting.maestro_runner import positions
+    bars = pd.date_range("2024-01-01", periods=2000, freq="5min", tz="UTC")
+    conf = pd.Series(np.random.default_rng(0).uniform(0, 1, len(bars)), index=bars)
+    signals = pd.DataFrame({"signal": 1, "confidence": conf, "regime": 2}, index=bars)
+    base = positions(signals, bars)["maestro_top10"]
+    later = signals.copy()
+    later.loc[bars[1500]:, "confidence"] = 0.0                  # change only the future
+    assert base[:bars[1500]].iloc[:-1].equals(positions(later, bars)["maestro_top10"][:bars[1500]].iloc[:-1])
+    assert (base[bars[:288]] == 0).all()                        # no cut-off until a day of history
+    assert 0.05 < (base[bars[300]:] != 0).mean() < 0.15         # trades roughly its top 10%
