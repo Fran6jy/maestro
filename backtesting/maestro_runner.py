@@ -48,6 +48,10 @@ VAL_MONTHS = 2          # last part of each training window used for early stopp
 HORIZON = 6             # primary forecast horizon in bars (30 minutes)
 EPOCHS = 40             # same settings as the Modal edge run
 WARMUP_BARS = 400       # history fed before each test block so sequence models have context
+# --fast: the TFT is the bottleneck (LSTMs over 120-bar windows). A 4x batch with the
+# learning rate scaled by sqrt(4), plus bf16 mixed precision. Checked against the
+# standard settings before use (validation loss, and the power test's planted edge).
+FAST_TFT = {"batch_size": 256, "lr": 2e-3, "amp": True}
 
 
 def load_features(instrument: str) -> pd.DataFrame:
@@ -61,7 +65,7 @@ def load_features(instrument: str) -> pd.DataFrame:
 
 
 def train_and_predict(df: pd.DataFrame, train_idx: pd.Index, test_idx: pd.Index,
-                      instrument: str, epochs: int) -> tuple[pd.DataFrame, dict]:
+                      instrument: str, epochs: int, fast: bool = False) -> tuple[pd.DataFrame, dict]:
     """Fit regime + signal agents on train_idx, forecast every bar of test_idx."""
     from maestro.agents.regime.regime_classifier import RegimeDetectionAgent
     from maestro.agents.regime.transformer_regime import TransformerConfig
@@ -91,11 +95,16 @@ def train_and_predict(df: pd.DataFrame, train_idx: pd.Index, test_idx: pd.Index,
 
     signal = SignalAgent(
         instrument=instrument, primary_horizon=HORIZON,
-        tft_config=TFTConfig(seq_len=120, pred_len=max(HORIZONS), max_epochs=epochs, patience=6),
+        tft_config=TFTConfig(seq_len=120, pred_len=max(HORIZONS), max_epochs=epochs, patience=6,
+                             **(FAST_TFT if fast else {})),
         ptst_config=PatchTSTConfig(seq_len=128, max_epochs=epochs, patience=6),
     )
+    t0 = time.time()
     signal.fit(fit_df, regime.predict_batch(fit_df)["regime"], val_df=val_df,
                val_regimes=regime.predict_batch(val_df)["regime"] if val_df is not None else None)
+    meta.update({"fast": fast, "signal_fit_minutes": round((time.time() - t0) / 60, 2),
+                 "tft_best_val_loss": getattr(signal.tft, "best_loss", None),
+                 "tft_epochs": getattr(signal.tft, "epochs_run", None)})
 
     # Forecast the test block with a run-up of earlier (already known) bars for context.
     start = df.index.get_indexer([test_idx[0]])[0]
@@ -148,6 +157,7 @@ def main() -> None:
     p.add_argument("--score-only", action="store_true", help="skip training; score the blocks already saved")
     p.add_argument("--holdout", action="store_true",
                    help="unlock the sealed holdout (maestro.data.holdout): final confirmation run only")
+    p.add_argument("--fast", action="store_true", help=f"faster TFT training: {FAST_TFT}")
     args = p.parse_args()
     if args.holdout:
         from maestro.data.holdout import unlock
@@ -155,19 +165,20 @@ def main() -> None:
 
     train_months = None if args.expanding else args.train_months
     epochs = args.epochs or (1 if args.smoke else EPOCHS)
-    tag = design_tag(args.refit_months, train_months)
+    tag = design_tag(args.refit_months, train_months) + ("_fast" if args.fast else "")
     out_dir = OUTPUT_DIR / "maestro" / (tag + ("_smoke" if args.smoke else ""))
 
     pooled = run_design(load_close(args.instrument), out_dir, args.instrument,
                         lambda: load_features(args.instrument), args.refit_months, train_months,
-                        epochs, max_blocks=1 if args.smoke else None, train=not args.score_only)
+                        epochs, max_blocks=1 if args.smoke else None, train=not args.score_only,
+                        fast=args.fast)
     if pooled is not None:
         print_summary(pooled)
 
 
 def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit_months: int = 3,
                train_months: int | None = 12, epochs: int = EPOCHS, max_blocks: int | None = None,
-               train: bool = True) -> pd.DataFrame | None:
+               train: bool = True, fast: bool = False) -> pd.DataFrame | None:
     """Train MAESTRO block by block (resumable), then score it with every baseline.
 
     features : callable returning the feature table, only called if a block needs training.
@@ -196,7 +207,7 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
             logger.info("block %d/%d: training on %d bars (%s -> %s), testing %s -> %s",
                         b.block_id + 1, len(blocks), len(b.train_idx), b.train_idx[0].date(),
                         b.train_idx[-1].date(), b.splits[0].test_start.date(), b.splits[-1].test_end.date())
-            sig, meta = train_and_predict(df, b.train_idx, b.test_idx, instrument, epochs)
+            sig, meta = train_and_predict(df, b.train_idx, b.test_idx, instrument, epochs, fast)
             meta.update({"block_id": b.block_id, "minutes": round((time.time() - t0) / 60, 1)})
             tmp = path.with_suffix(".tmp")
             sig.to_parquet(tmp)

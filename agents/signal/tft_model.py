@@ -116,6 +116,7 @@ class TFTConfig:
     max_epochs:        int   = 60
     patience:          int   = 10
     gradient_clip:     float = 0.1
+    amp:               bool  = False    # bf16 mixed precision on CUDA (weights stay fp32)
     device:            str   = field(default_factory=_auto_device)
 
     # Regime conditioning
@@ -359,6 +360,12 @@ class TFTSignalModel:
         patience   = 0
         best_state = None
 
+        # Validation windows never change between epochs, so build them once.
+        val = None
+        if val_df is not None and val_regimes is not None:
+            vp, vf, vs, vr, vt = self._prepare(val_df, val_regimes, instrument, fit_scalers=False)
+            val = (vp, vf, vs, vr, vt / self.target_scale)
+
         for epoch in range(self.cfg.max_epochs):
             train_loss = self._run_epoch(
                 past_arr, fut_arr, static_arr, reg_arr, target_arr,
@@ -366,11 +373,8 @@ class TFTSignalModel:
             )
 
             val_loss = None
-            if val_df is not None and val_regimes is not None:
-                vp, vf, vs, vr, vt = self._prepare(
-                    val_df, val_regimes, instrument, fit_scalers=False
-                )
-                val_loss = self._run_epoch(vp, vf, vs, vr, vt / self.target_scale, None, training=False)
+            if val is not None:
+                val_loss = self._run_epoch(*val, None, training=False)
                 scheduler.step(val_loss)
                 monitor = val_loss
             else:
@@ -396,6 +400,8 @@ class TFTSignalModel:
             self.model.load_state_dict(best_state)
 
         self.fitted = True
+        self.best_loss = float(best_loss)
+        self.epochs_run = epoch + 1
         logger.info("TFT training complete. Best loss: %.5f", best_loss)
         return self
 
@@ -590,7 +596,9 @@ class TFTSignalModel:
             self.model.eval()
 
         ctx = torch.no_grad() if not training else torch.enable_grad()
-        with ctx:
+        amp = torch.autocast("cuda", dtype=torch.bfloat16,
+                             enabled=self.cfg.amp and str(self.cfg.device).startswith("cuda"))
+        with ctx, amp:
             for start in range(0, n, self.cfg.batch_size):
                 batch = idx[start: start + self.cfg.batch_size]
                 p  = torch.tensor(past[batch],    dtype=torch.float32).to(self.cfg.device)
@@ -600,7 +608,7 @@ class TFTSignalModel:
                 y  = torch.tensor(targets[batch], dtype=torch.float32).to(self.cfg.device)
 
                 preds, _ = self.model(p, f, s, r)   # (B, pred_len, Q)
-                loss     = _quantile_loss(preds, y, self.cfg.quantiles)
+                loss     = _quantile_loss(preds.float(), y, self.cfg.quantiles)
 
                 if training and optimiser:
                     optimiser.zero_grad()

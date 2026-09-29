@@ -88,7 +88,8 @@ def planted_candles(raw: pd.DataFrame, beta: float) -> pd.DataFrame:
     return out
 
 
-def run_level(level: float, raw: pd.DataFrame, blocks: int | None, epochs: int) -> pd.DataFrame:
+def run_level(level: float, raw: pd.DataFrame, blocks: int | None, epochs: int,
+              fast: bool = False) -> pd.DataFrame:
     from maestro.data.pipeline.store import build_features
 
     r = np.r_[0.0, np.diff(np.log(raw["close"].to_numpy()))]
@@ -101,9 +102,9 @@ def run_level(level: float, raw: pd.DataFrame, blocks: int | None, epochs: int) 
     rp = np.log(close / close.shift(1)).fillna(0.0).to_numpy()
     oracle = pd.Series(np.sign(np.nan_to_num(momentum(rp))), index=close.index)
 
-    out_dir = OUTPUT_DIR / "power" / f"level_{level:.3f}"
+    out_dir = OUTPUT_DIR / "power" / (f"level_{level:.3f}" + ("_fast" if fast else ""))
     pooled = run_design(close, out_dir, "EUR_USD", lambda: feats, epochs=epochs,
-                        max_blocks=blocks, train=True)
+                        max_blocks=blocks, train=True, fast=fast)
     if pooled is None:
         return pd.DataFrame()
     # Score the oracle with the same code, alongside MAESTRO and the baselines.
@@ -127,13 +128,14 @@ def main() -> None:
                    help="oracle hit rates to plant (0 = no edge)")
     p.add_argument("--blocks", type=int, default=None, help="limit retraining blocks per level")
     p.add_argument("--epochs", type=int, default=EPOCHS)
+    p.add_argument("--fast", action="store_true", help="faster TFT settings (maestro_runner.FAST_TFT)")
     args = p.parse_args()
 
     from maestro.data.pipeline.store import TARGET, load_candles
     raw = load_candles(TARGET).loc[WINDOW[0]:WINDOW[1]]
-    results = [run_level(level, raw, args.blocks, args.epochs) for level in args.levels]
+    results = [run_level(level, raw, args.blocks, args.epochs, args.fast) for level in args.levels]
     table = pd.concat(results, ignore_index=True)
-    path = OUTPUT_DIR / "power" / "summary.csv"
+    path = OUTPUT_DIR / "power" / ("summary_fast.csv" if args.fast else "summary.csv")
     table.to_csv(path, index=False)
     for level, g in table.groupby("level"):
         print(f"\n=== planted oracle hit {level:.3f} ===")
