@@ -49,6 +49,8 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from maestro.config.instruments import get_instrument_spec
+
 logger = logging.getLogger(__name__)
 
 # ── Instrument cost parameters ────────────────────────────────────────────────
@@ -69,6 +71,14 @@ INSTRUMENT_COSTS = {
         "lot_size":              100_000,
         "min_spread_pips":       0.4,
     },
+    "USD_JPY": {"typical_spread_pips": 1.0, "wide_spread_pips": 3.0, "commission_per_lot": 0.0, "pip_value_per_lot": 9.0, "lot_size": 100_000, "min_spread_pips": 0.4},
+    "USD_CHF": {"typical_spread_pips": 1.2, "wide_spread_pips": 3.5, "commission_per_lot": 0.0, "pip_value_per_lot": 11.0, "lot_size": 100_000, "min_spread_pips": 0.5},
+    "USD_CAD": {"typical_spread_pips": 1.2, "wide_spread_pips": 3.5, "commission_per_lot": 0.0, "pip_value_per_lot": 7.5, "lot_size": 100_000, "min_spread_pips": 0.5},
+    "AUD_USD": {"typical_spread_pips": 1.1, "wide_spread_pips": 3.5, "commission_per_lot": 0.0, "pip_value_per_lot": 10.0, "lot_size": 100_000, "min_spread_pips": 0.5},
+    "NZD_USD": {"typical_spread_pips": 1.4, "wide_spread_pips": 4.0, "commission_per_lot": 0.0, "pip_value_per_lot": 10.0, "lot_size": 100_000, "min_spread_pips": 0.6},
+    # Conservative research defaults. Live trading must calibrate these from
+    # observed account-specific bid/ask prices before promotion.
+    "XAU_USD": {"typical_spread_pips": 25.0, "wide_spread_pips": 100.0, "commission_per_lot": 0.0, "pip_value_per_lot": 1.0, "lot_size": 100, "min_spread_pips": 10.0},
 }
 
 # Session-based spread multipliers
@@ -119,7 +129,9 @@ class TransactionCostModel:
 
     def __init__(self, instrument: str = "EUR_USD") -> None:
         self.instrument = instrument
-        params          = INSTRUMENT_COSTS.get(instrument, INSTRUMENT_COSTS["EUR_USD"])
+        self.spec       = get_instrument_spec(instrument)
+        params          = INSTRUMENT_COSTS[instrument]
+        self.pip_size       = self.spec.pip_size
         self.typical_spread  = params["typical_spread_pips"]
         self.wide_spread     = params["wide_spread_pips"]
         self.min_spread      = params["min_spread_pips"]
@@ -161,8 +173,8 @@ class TransactionCostModel:
             multiplier  = SESSION_SPREAD_MULTIPLIER.get(session, 1.0)
             spread_pips = max(base_spread * multiplier, self.min_spread)
 
-        # Convert pips to log-return units: 1 pip = 0.0001 / price
-        pip_in_price  = 0.0001
+        # Convert instrument-specific pips to log-return units.
+        pip_in_price  = self.pip_size
         spread_lr     = (spread_pips * pip_in_price) / price   # one-way cost
 
         # ── 2. Slippage ────────────────────────────────────────────────────────
@@ -244,12 +256,13 @@ class TransactionCostModel:
             price = float(prices.iloc[i]) if i < len(prices) else 1.0
             vol   = float(vol_series.iloc[i]) if i < len(vol_series) else 0.001
 
-            # Is this bar a trade? (signal changes or new non-flat signal)
-            is_trade = (sig != 0) and (sig != prev_signal or sig != 0)
+            # Pay costs only when the target position changes. A reversal has
+            # twice the turnover of an entry; closing to flat also has a cost.
+            is_trade = sig != prev_signal
             session  = _get_session(ts)
 
             if is_trade:
-                est = self.estimate(units * sig, price, vol, session)
+                est = self.estimate(units * (sig - prev_signal), price, vol, session)
                 total_cost = est.total_cost
             else:
                 total_cost = 0.0
@@ -278,7 +291,7 @@ class TransactionCostModel:
             "Cost model applied: %d trades | total_cost_drag=%.4f "
             "(%.1f pips) | avg_per_trade=%.5f",
             n_trades, total_drag,
-            total_drag * price / 0.0001,
+            total_drag * price / self.pip_size,
             avg_cost,
         )
         return df

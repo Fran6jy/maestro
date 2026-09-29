@@ -66,13 +66,16 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from maestro.config.instruments import get_instrument_spec
+
 from maestro.agents.risk.risk_agent import RiskDecision, HARD_LIMITS
 
 logger = logging.getLogger(__name__)
 
 # MiFID II / ESMA limits
 ESMA_LEVERAGE_LIMITS = {
-    "EUR_USD": 30, "GBP_USD": 30, "USD_JPY": 30,
+    "EUR_USD": 30, "GBP_USD": 30, "USD_JPY": 30, "USD_CHF": 30,
+    "USD_CAD": 30, "AUD_USD": 30, "NZD_USD": 30, "XAU_USD": 20,
     "indices": 20, "commodities": 10, "crypto": 2,
 }
 
@@ -138,6 +141,7 @@ class ComplianceEngine:
         skip_market_hours: bool = False,
     ) -> None:
         self.instrument     = instrument
+        self.spec           = get_instrument_spec(instrument)
         self.equity         = account_equity
         self.leverage_limit = ESMA_LEVERAGE_LIMITS.get(instrument, 30)
         self.audit_dir      = Path(audit_log_dir or os.path.expanduser("~/.maestro/audit"))
@@ -147,6 +151,7 @@ class ComplianceEngine:
         self._daily_orders:       int   = 0
         self._daily_pnl:          float = 0.0
         self._daily_date:         object = None
+        self._daily_start_equity: float = account_equity
         self._last_trade_ts:      datetime | None = None
         self._last_position:      int   = 0
         self._order_timestamps:   list[datetime] = []
@@ -165,6 +170,7 @@ class ComplianceEngine:
         current_price:float,
         high_impact:  bool = False,
         news_ts:      datetime | None = None,
+        as_of:        datetime | None = None,
     ) -> ComplianceResult:
         """
         Run all pre-trade compliance checks.
@@ -180,7 +186,7 @@ class ComplianceEngine:
         -------
         ComplianceResult — if not .passed, DO NOT execute the trade
         """
-        now    = datetime.now(timezone.utc)
+        now    = as_of or datetime.now(timezone.utc)
         checks = {}
         warnings = []
 
@@ -192,7 +198,14 @@ class ComplianceEngine:
             return self._fail_fast("circuit_breaker_active", decision, now)
 
         # ── 2. Position limit ─────────────────────────────────────────────────
-        notional = abs(decision.units) * current_price
+        if self.spec.quote_currency == "USD":
+            notional = abs(decision.units) * current_price
+        elif self.spec.base_currency == "USD":
+            notional = abs(decision.units)
+        else:
+            # Crosses require a point-in-time home conversion and are not yet
+            # admitted to the initial trading universe.
+            notional = float("inf")
         max_notional = self.equity * self.leverage_limit * PRE_TRADE_LIMITS["max_position_pct"]
         checks["position_limit"] = notional <= max_notional
         if notional > max_notional * 0.90:
@@ -291,7 +304,7 @@ class ComplianceEngine:
         checks = {}
 
         # ── Best execution ─────────────────────────────────────────────────────
-        slippage_pips = abs(fill_price - signal_price) / 0.0001
+        slippage_pips = abs(fill_price - signal_price) / self.spec.pip_size
         checks["best_execution"] = slippage_pips <= 3.0   # max 3 pips slippage
 
         # ── Anomalous slippage ─────────────────────────────────────────────────
@@ -319,9 +332,10 @@ class ComplianceEngine:
     # ── Update equity / P&L ───────────────────────────────────────────────────
     def update_equity(self, new_equity: float) -> None:
         """Called after each trade fills to update daily P&L tracking."""
-        self.equity    = new_equity
-        daily_loss     = (new_equity - self.equity) / self.equity
-        self._daily_pnl= daily_loss
+        self.equity     = new_equity
+        self._daily_pnl = (
+            new_equity - self._daily_start_equity
+        ) / max(self._daily_start_equity, 1.0)
 
         # Auto-trigger circuit breaker on max drawdown
         if self._daily_pnl <= -HARD_LIMITS["max_drawdown"]:
@@ -403,14 +417,15 @@ class ComplianceEngine:
             from maestro.agents.risk.risk_agent import RiskDecision
             stub = RiskDecision(
                 timestamp=ts, instrument=self.instrument,
-                action=str(row.get("final_action", "flat")),
+                action=str(row.get("final_action", row.get("action", "flat"))),
                 units=units, stop_loss_pips=sl, take_profit_pips=tp,
                 position_fraction=float(row.get("position_fraction", 0.0)),
                 kelly_fraction=0.1, var_utilisation=0.0, cvar=0.002,
                 drawdown=float(row.get("risk_drawdown", 0.0)), daily_pnl=0.0,
                 risk_reason="batch_check",
             )
-            result = self.pre_trade_check(stub, price)
+            as_of = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+            result = self.pre_trade_check(stub, price, as_of=as_of)
             results.append({
                 "timestamp": ts,
                 "compliant": result.passed,
@@ -431,6 +446,7 @@ class ComplianceEngine:
             self._daily_orders  = 0
             self._daily_pnl     = 0.0
             self._daily_date    = today
+            self._daily_start_equity = self.equity
             self._order_timestamps = []
 
     @staticmethod

@@ -57,6 +57,7 @@ import pandas as pd
 
 from maestro.agents.risk.risk_agent import RiskDecision
 from maestro.agents.risk.cost_model import TransactionCostModel, _get_session
+from maestro.config.instruments import get_instrument_spec
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,8 @@ class ExecutionAgent:
         account_id:  str  | None = None,
     ) -> None:
         self.instrument  = instrument
+        self.spec        = get_instrument_spec(instrument)
+        self.pip_size    = self.spec.pip_size
         self.live        = live
         self.account_id  = account_id
         self.cost_model  = TransactionCostModel(instrument)
@@ -248,7 +251,7 @@ class ExecutionAgent:
 
             if use_limit:
                 # Limit order: place LIMIT_OFFSET_PIPS inside spread
-                offset     = LIMIT_OFFSET_PIPS * 0.0001
+                offset     = LIMIT_OFFSET_PIPS * self.pip_size
                 limit_px   = curr_close - offset if units > 0 else curr_close + offset
                 # Check if price trades through limit in next bar
                 next_low   = float(next_bar.get("low",  next_bar.get("mid_l", curr_close)))
@@ -275,7 +278,7 @@ class ExecutionAgent:
             # Add spread (always paid on market orders; not on limit fills)
             cost_est    = self.cost_model.estimate(units, fill_price, session=session)
             spread_cost = cost_est.spread_cost if order_type == "MARKET" else cost_est.spread_cost * 0.5
-            slippage    = abs(fill_price - curr_close) / 0.0001   # pips
+            slippage    = abs(fill_price - curr_close) / self.pip_size
 
             # VWAP comparison (did we beat the average bar price?)
             bar_vwap   = (float(next_bar.get("high", fill_price)) +
@@ -310,7 +313,7 @@ class ExecutionAgent:
         use_limit = self._should_use_limit(
             decision.position_fraction, decision.metadata.get("regime", 2), session
         )
-        pip = 0.0001
+        pip = self.pip_size
 
         if use_limit:
             offset     = LIMIT_OFFSET_PIPS * pip
@@ -372,7 +375,7 @@ class ExecutionAgent:
                 )
 
             fill_price = float(result.get("price", current_price))
-            slippage   = abs(fill_price - current_price) / 0.0001
+            slippage   = abs(fill_price - current_price) / self.pip_size
 
             return FillReport(
                 order_id      = result.get("id", order.client_id),
@@ -410,7 +413,7 @@ class ExecutionAgent:
         else:
             fill_price = order.limit_price or current_price
 
-        slippage = abs(fill_price - current_price) / 0.0001
+        slippage = abs(fill_price - current_price) / self.pip_size
 
         return FillReport(
             order_id      = f"SIM-{uuid.uuid4().hex[:8]}",

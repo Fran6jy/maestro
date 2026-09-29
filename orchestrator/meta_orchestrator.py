@@ -368,8 +368,10 @@ class MetaOrchestrator:
             )
 
             # Risk decision from pre-computed signal df
-            risk_action    = "trade" if sig != 0 and sig_conf >= 0.52 else "flat"
-            units          = int(signal_df.loc[ts, "signal"]) * 10_000 if ts in signal_df.index else 0
+            # The execution target must use the fused decision, not bypass it
+            # with the raw technical signal.
+            risk_action    = "trade" if final_sig != 0 and agg_conf >= 0.52 else "flat"
+            units          = final_sig * 10_000
             sl_pips        = float(signal_df.loc[ts, "stop_loss_pips"])    if ts in signal_df.index and "stop_loss_pips" in signal_df.columns else 12.0
             tp_pips        = float(signal_df.loc[ts, "take_profit_pips"])  if ts in signal_df.index and "take_profit_pips" in signal_df.columns else 24.0
 

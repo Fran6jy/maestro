@@ -100,6 +100,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # Annualisation factor: 252 days × 78 M5 bars per day
 ANNUAL_FACTOR = np.sqrt(252 * 78)
+REGIME_LABELS = {0: "bull_trend", 1: "bear_trend", 2: "sideways", 3: "crisis"}
 
 
 @dataclass
@@ -222,7 +223,7 @@ class BacktestEngine:
     def _run_instrument(self, instrument: str) -> list[SplitResult]:
         from maestro.data.pipeline.ingestion import DataPipeline
         from maestro.data.validation.wfa import WalkForwardEngine
-        from maestro.agents.regime.regime_classifier import RegimeDetectionAgent, REGIME_NAMES
+        from maestro.agents.regime.regime_classifier import RegimeDetectionAgent
         from maestro.agents.signal.signal_agent import SignalAgent
         from maestro.agents.signal.tft_model import TFTConfig
         from maestro.agents.signal.patchtst import PatchTSTConfig, HORIZONS
@@ -399,34 +400,40 @@ class BacktestEngine:
                     test_df, combined, test_regimes, sentiment_df
                 )
 
-            # Compliance checks
-            decisions_df = compliance.check_batch(decisions_df, test_df)
-
-            # Risk decisions + execution simulation
+            # Risk sizes the orchestrator's fused signal. It must not bypass
+            # fusion by consuming the raw technical signal directly.
+            risk_inputs = combined.copy()
+            risk_inputs["signal"] = decisions_df["final_signal"]
+            risk_inputs["confidence"] = decisions_df["aggregate_confidence"]
+            risk_inputs["regime"] = decisions_df["regime"]
             risk_decisions = risk_agent.evaluate_batch(
-                test_df, combined,
-                regime_signals=test_regimes
+                test_df, risk_inputs,
+                regime_signals=test_regimes,
+                simulate_equity=False,
             )
-            if "compliant" in decisions_df.columns:
-                risk_decisions["compliant"] = decisions_df.reindex(risk_decisions.index)["compliant"]
-                non_compliant = ~risk_decisions["compliant"].fillna(True).astype(bool)
-                risk_decisions.loc[non_compliant, "action"] = "flat"
-                risk_decisions.loc[non_compliant, "units"]  = 0
+            risk_decisions["regime"] = decisions_df["regime"]
+            risk_decisions["final_signal"] = decisions_df["final_signal"]
+            risk_decisions = compliance.check_batch(risk_decisions, test_df)
 
-            # Execution simulation
-            exec_agent = ExecutionAgent(instrument=instrument, live=False)
-            fills_df   = exec_agent.simulate_batch(risk_decisions, test_df)
+            # Authoritative accounting path: decision at t -> target fill at
+            # next bar open -> costs and P&L in one causal ledger.
+            from maestro.backtesting.portfolio_ledger import CausalPortfolioLedger, LedgerConfig
+            ledger = CausalPortfolioLedger(
+                instrument,
+                LedgerConfig(initial_equity=self.cfg.account_equity),
+            )
+            ledger_df = ledger.run(risk_decisions, test_df)
 
             # ── METRICS ───────────────────────────────────────────────────────
             result = self._compute_split_metrics(
-                risk_decisions, fills_df, test_df,
+                ledger_df, ledger_df, test_df,
                 test_regimes, split.split_id, instrument
             )
             instrument_results.append(result)
 
             # Dashboard update
-            if "equity" in risk_decisions.columns:
-                final_equity = float(risk_decisions["equity"].iloc[-1])
+            if "equity" in ledger_df.columns:
+                final_equity = float(ledger_df["equity"].iloc[-1])
                 dashboard.update(equity=final_equity)
 
             t_elapsed = time.time() - t0
@@ -443,7 +450,7 @@ class BacktestEngine:
                 risk_agent.save(sp / "risk")
                 regime_agent.save(sp / "regime")
 
-            risk_decisions.to_parquet(inst_out / f"decisions_split_{split.split_id:03d}.parquet")
+            ledger_df.to_parquet(inst_out / f"decisions_split_{split.split_id:03d}.parquet")
 
             # XAI (on a sample)
             if self.cfg.generate_xai and len(decisions_df) > 50:
@@ -465,7 +472,6 @@ class BacktestEngine:
         split_id:    int,
         instrument:  str,
     ) -> SplitResult:
-        from maestro.agents.regime.regime_classifier import REGIME_NAMES
         from maestro.agents.risk.cost_model import TransactionCostModel
 
         close    = features["close"].reindex(decisions.index).ffill()
@@ -473,11 +479,15 @@ class BacktestEngine:
         units    = decisions.get("units", pd.Series(0, index=decisions.index)).fillna(0)
         direction= np.sign(units.values)
 
-        # Gross returns (no costs)
-        gross_rets = pd.Series(direction * bar_rets.values, index=decisions.index)
+        # Prefer returns produced by the causal fill ledger.
+        if "gross_return" in decisions.columns:
+            gross_rets = decisions["gross_return"].fillna(0.0)
+        else:
+            gross_rets = pd.Series(direction * bar_rets.values, index=decisions.index)
 
-        # Net returns from equity curve
-        if "equity" in decisions.columns:
+        if "net_return" in decisions.columns:
+            net_rets = decisions["net_return"].fillna(0.0)
+        elif "equity" in decisions.columns:
             eq      = decisions["equity"].ffill()
             net_rets= eq.pct_change().fillna(0)
         else:
@@ -495,12 +505,11 @@ class BacktestEngine:
             ds = s[s < 0].std() + 1e-10
             return float(m / ds * ANNUAL_FACTOR)
 
-        gross_active = gross_rets[gross_rets != 0]
-        net_active   = net_rets[net_rets != 0]
-
-        sh_net   = sharpe(net_active)   if len(net_active)   > 10 else 0.0
-        sh_gross = sharpe(gross_active) if len(gross_active) > 10 else 0.0
-        so_net   = sortino(net_active)  if len(net_active)   > 10 else 0.0
+        # Flat bars remain in the series. Removing them and then annualising as
+        # continuous M5 exposure materially inflates Sharpe and Sortino.
+        sh_net   = sharpe(net_rets)   if len(net_rets)   > 10 else 0.0
+        sh_gross = sharpe(gross_rets) if len(gross_rets) > 10 else 0.0
+        so_net   = sortino(net_rets)  if len(net_rets)   > 10 else 0.0
 
         # Drawdown
         cum      = (1 + net_rets).cumprod()
@@ -515,15 +524,18 @@ class BacktestEngine:
         # Hit ratio
         active_mask  = direction != 0
         n_active     = active_mask.sum()
-        hit_ratio    = float((np.sign(bar_rets.values[active_mask]) == direction[active_mask]).mean()) if n_active > 0 else 0.5
+        hit_ratio    = float((gross_rets.values[active_mask] > 0).mean()) if n_active > 0 else 0.5
 
         # Profit factor
-        wins  = net_active[net_active > 0].sum()
-        losses= abs(net_active[net_active < 0].sum()) + 1e-10
+        wins  = net_rets[net_rets > 0].sum()
+        losses= abs(net_rets[net_rets < 0].sum()) + 1e-10
         pf    = float(wins / losses)
 
         # Cost drag
-        cost_drag = float(sh_gross - sh_net) / ANNUAL_FACTOR if sh_gross != 0 else 0.0
+        if "transaction_cost" in decisions.columns:
+            cost_drag = float(decisions["transaction_cost"].sum() / self.cfg.account_equity)
+        else:
+            cost_drag = float(sh_gross - sh_net) / ANNUAL_FACTOR if sh_gross != 0 else 0.0
 
         # CVaR
         arr    = net_rets.values
@@ -535,16 +547,15 @@ class BacktestEngine:
         regime_sharpes = {}
         reg_col = "regime" if "regime" in decisions.columns else None
         if reg_col and reg_col in decisions.columns:
-            from maestro.agents.regime.regime_classifier import REGIME_NAMES
             for r in range(4):
                 mask = decisions[reg_col].values == r
                 if mask.sum() > 50:
                     r_rets = net_rets[mask]
-                    regime_sharpes[REGIME_NAMES[r]] = float(
+                    regime_sharpes[REGIME_LABELS[r]] = float(
                         r_rets.mean() / (r_rets.std() + 1e-10) * ANNUAL_FACTOR
                     )
 
-        n_trades = int(active_mask.sum())
+        n_trades = int(fills["executed"].fillna(False).sum()) if "executed" in fills.columns else int(active_mask.sum())
         avg_cost = float(cost_drag / max(n_trades, 1))
 
         return SplitResult(
@@ -562,7 +573,7 @@ class BacktestEngine:
             hit_ratio         = hit_ratio,
             profit_factor     = pf,
             sharpe_gross      = sh_gross,
-            cum_return_gross  = float(gross_active.sum()),
+            cum_return_gross  = float((1 + gross_rets).prod() - 1),
             total_cost_drag   = cost_drag,
             avg_cost_per_trade= avg_cost,
             cvar_95           = cvar,

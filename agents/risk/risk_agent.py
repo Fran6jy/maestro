@@ -60,6 +60,7 @@ from maestro.agents.risk.kelly import KellyPositionSizer, KellyResult, REGIME_KE
 from maestro.agents.risk.cvar_env import CVaRTradingEnv, EnvConfig
 from maestro.agents.signal.signal_agent import SignalPacket
 from maestro.agents.regime.regime_classifier import RegimeSignal, REGIME_NAMES
+from maestro.config.instruments import get_instrument_spec
 
 logger = logging.getLogger(__name__)
 
@@ -165,18 +166,21 @@ class RiskManagementAgent:
         use_rl:         bool  = True,
     ) -> None:
         self.instrument = instrument
+        self.spec       = get_instrument_spec(instrument)
+        self.pip_size   = self.spec.pip_size
         self.equity     = account_equity
         self.leverage   = leverage
         self.use_rl     = use_rl
 
         self.cost_model = TransactionCostModel(instrument)
-        self.kelly      = KellyPositionSizer(account_equity, leverage)
+        self.kelly      = KellyPositionSizer(account_equity, leverage, pip_size=self.pip_size)
         self.rl_policy  = None     # PPO policy — set after train_rl()
         self.fitted     = False
 
         # State tracking
         self._daily_pnl:    float = 0.0
         self._daily_date:   object = None
+        self._daily_start_equity: float = account_equity
         self._return_history: list[float] = []
         self._peak_equity:  float = account_equity
 
@@ -325,7 +329,7 @@ class RiskManagementAgent:
         # ── Layer D: Cost filter ──────────────────────────────────────────────
         cost_est  = self.cost_model.estimate(units, current_price,
                                               session=self._current_session(ts))
-        edge_pips = signal_packet.pred_p50 * current_price / 0.0001 if signal_packet.pred_p50 else 0.0
+        edge_pips = signal_packet.pred_p50 * current_price / self.pip_size if signal_packet.pred_p50 else 0.0
         if edge_pips < HARD_LIMITS["min_edge_pips"] + cost_est.breakeven_pips:
             return self._flat_decision(ts,
                 f"insufficient_edge: {edge_pips:.2f}p < {cost_est.breakeven_pips:.2f}p breakeven")
@@ -367,6 +371,7 @@ class RiskManagementAgent:
         features_df:    pd.DataFrame,
         signals_df:     pd.DataFrame,
         regime_signals: pd.DataFrame,
+        simulate_equity: bool = True,
     ) -> pd.DataFrame:
         """
         Apply risk management to all bars in a backtest.
@@ -429,8 +434,9 @@ class RiskManagementAgent:
                 recent_returns   = recent_ret,
             )
 
-            # Simulate equity update
-            if decision.is_trade and ts in ret_ser.index:
+            # Legacy standalone simulation. The end-to-end backtest disables
+            # this and delegates accounting to CausalPortfolioLedger.
+            if simulate_equity and decision.is_trade and ts in ret_ser.index:
                 bar_ret    = float(ret_ser.loc[ts]) * decision.units / (equity * self.leverage / price)
                 cost_est   = self.cost_model.estimate(decision.units, price)
                 net_ret    = bar_ret - cost_est.total_cost
@@ -441,7 +447,7 @@ class RiskManagementAgent:
 
             d = decision.to_dict()
             d["equity"]    = equity
-            d["net_return"]= (equity / self.equity) - 1
+            d["net_return"]= (equity / self.equity) - 1 if simulate_equity else 0.0
             decisions.append(d)
 
         result = pd.DataFrame(decisions).set_index("timestamp")
@@ -516,7 +522,7 @@ class RiskManagementAgent:
         Compute stop-loss and take-profit in pips from TFT quantile predictions.
         Falls back to regime-based defaults if predictions are unavailable.
         """
-        pip = 0.0001
+        pip = self.pip_size
 
         # Use TFT quantile spread for SL/TP if available
         if p10 != 0.0 and p90 != 0.0:
@@ -559,7 +565,8 @@ class RiskManagementAgent:
         if self._daily_date != today:
             self._daily_pnl  = 0.0
             self._daily_date = today
-        self._daily_pnl = (equity - self.equity) / self.equity
+            self._daily_start_equity = equity
+        self._daily_pnl = (equity - self._daily_start_equity) / max(self._daily_start_equity, 1.0)
 
     @staticmethod
     def _current_session(ts: pd.Timestamp) -> str:
