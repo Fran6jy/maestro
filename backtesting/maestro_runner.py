@@ -159,6 +159,11 @@ def main() -> None:
     p.add_argument("--holdout", action="store_true",
                    help="unlock the sealed holdout (maestro.data.holdout): final confirmation run only")
     p.add_argument("--fast", action="store_true", help=f"faster TFT training: {FAST_TFT}")
+    p.add_argument("--shard", default=None, metavar="I/N",
+                   help="train only blocks with block_id %% N == I (split work across GPUs or machines)")
+    p.add_argument("--reverse", action="store_true", help="train the latest blocks first")
+    p.add_argument("--max-hours", type=float, default=None,
+                   help="stop starting new blocks when a block might not finish in this many hours")
     args = p.parse_args()
     if args.holdout:
         from maestro.data.holdout import unlock
@@ -172,17 +177,24 @@ def main() -> None:
     pooled = run_design(load_close(args.instrument), out_dir, args.instrument,
                         lambda: load_features(args.instrument), args.refit_months, train_months,
                         epochs, max_blocks=1 if args.smoke else None, train=not args.score_only,
-                        fast=args.fast)
+                        fast=args.fast, shard=tuple(map(int, args.shard.split("/"))) if args.shard else None,
+                        reverse=args.reverse,
+                        deadline=time.time() + args.max_hours * 3600 if args.max_hours else None)
     if pooled is not None:
         print_summary(pooled)
 
 
 def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit_months: int = 3,
                train_months: int | None = 12, epochs: int = EPOCHS, max_blocks: int | None = None,
-               train: bool = True, fast: bool = False) -> pd.DataFrame | None:
+               train: bool = True, fast: bool = False, shard: tuple[int, int] | None = None,
+               reverse: bool = False, deadline: float | None = None) -> pd.DataFrame | None:
     """Train MAESTRO block by block (resumable), then score it with every baseline.
 
     features : callable returning the feature table, only called if a block needs training.
+    shard    : (i, n) trains only blocks with block_id % n == i, so several GPUs or machines
+               can share one design; blocks are independent, so the results are identical.
+    deadline : epoch seconds after which no new block is started if it might not finish
+               (a cloud session's time limit); finished blocks are kept either way.
     Returns the pooled scores, or None if some blocks are still missing.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -199,11 +211,15 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
         import torch
         logger.info("Device: %s", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")
         df = features()
-        for b in blocks:
+        mine = [b for b in blocks if shard is None or b.block_id % shard[1] == shard[0]]
+        longest = 20 * 60.0                                  # assume 20 min until one has been timed
+        for b in (reversed(mine) if reverse else mine):
             path = out_dir / f"block_{b.block_id:02d}.parquet"
             if path.exists():
-                logger.info("block %d already done, skipping", b.block_id)
                 continue
+            if deadline and time.time() + 1.3 * longest > deadline:
+                logger.info("Stopping before block %d: it might not finish before the deadline", b.block_id)
+                break
             t0 = time.time()
             logger.info("block %d/%d: training on %d bars (%s -> %s), testing %s -> %s",
                         b.block_id + 1, len(blocks), len(b.train_idx), b.train_idx[0].date(),
@@ -214,6 +230,7 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
             sig.to_parquet(tmp)
             tmp.replace(path)                                  # atomic: never a half-written block
             (out_dir / f"block_{b.block_id:02d}.json").write_text(json.dumps(meta, indent=2))
+            longest = max(longest, time.time() - t0)
             logger.info("block %d done in %.1f min (%d signals)", b.block_id, meta["minutes"], len(sig))
 
     files = [out_dir / f"block_{b.block_id:02d}.parquet" for b in blocks]
