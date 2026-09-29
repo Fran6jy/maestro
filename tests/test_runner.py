@@ -43,3 +43,20 @@ def test_deadline_stops_new_blocks(tmp_path, monkeypatch):
     assert runner.run_design(_close(), tmp_path, "EUR_USD", lambda: None,
                              deadline=time.time() + 60) is None
     assert calls == []                                     # a 20-minute block can't fit in a minute
+
+
+def test_block_id_lists_round_trip():
+    ids = {0, 1, 2, 3, 7, 9, 10}
+    assert runner.format_ids(ids) == "0-3,7,9-10"
+    assert runner.parse_ids(runner.format_ids(ids)) == ids
+    assert runner.parse_ids("") == set()
+
+
+def test_skipped_blocks_are_not_trained(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(runner, "train_and_predict", _stub(calls))
+    close = _close()
+    blocks = refit_plan(close, 3, 12)
+    runner.run_design(close, tmp_path, "EUR_USD", lambda: None, skip={0, 1})
+    assert len(calls) == len(blocks) - 2
+    assert blocks[0].test_idx[0] not in calls and blocks[1].test_idx[0] not in calls
