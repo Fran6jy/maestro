@@ -93,7 +93,9 @@ export default function StrategyLab() {
                           onChange={() => setKey(st.key)}
                         />
                         <span className={styles.optName}>{st.label}</span>
-                        <span className={`num ${styles.optVal} ${f >= START ? styles.gain : styles.loss}`}>{gbp(f)}</span>
+                        <span className={`num ${styles.optVal} ${st.trades === 0 ? styles.idle : f >= START ? styles.gain : styles.loss}`}>
+                          {st.trades === 0 ? "No trades" : gbp(f)}
+                        </span>
                       </label>
                     );
                   })}
@@ -138,7 +140,7 @@ export default function StrategyLab() {
 
             <div className={styles.headline} aria-live="polite">
               <p className={styles.headLead}>£10,000 traded with {s.label}, Jan 2023 to Mar 2026</p>
-              <p className={`num ${styles.big} ${up ? styles.gain : styles.cool}`}>{gbp(shown)}</p>
+              <p className={`num ${styles.big} ${s.trades === 0 ? styles.idle : up ? styles.gain : styles.cool}`}>{gbp(shown)}</p>
               <p className={styles.headSub}>
                 at {cost.toFixed(2)} pips per trade · <span className={styles.amberText}>{gbp(endNo)}</span> with no costs
               </p>
@@ -212,6 +214,8 @@ export default function StrategyLab() {
           <ol className={styles.rows}>
             {board.map(({ st, final }) => {
               const w = (Math.log10(Math.max(1, Math.min(30_000, final))) / Math.log10(30_000)) * 100;
+              const idle = st.trades === 0;
+              const bar = idle ? styles.barIdle : final >= START ? styles.barGain : styles.barLoss;
               return (
                 <li key={st.key}>
                   <button
@@ -223,12 +227,17 @@ export default function StrategyLab() {
                     <span className={styles.rowName}>{st.label}</span>
                     <span className={styles.rowTrack}>
                       <span
-                        className={`${styles.rowBar} ${final >= START ? styles.barGain : styles.barLoss}`}
+                        className={`${styles.rowBar} ${bar}`}
                         style={{ width: `${w}%` }}
                       />
                       <span className={styles.rowStart} style={{ left: `${(Math.log10(START) / Math.log10(30_000)) * 100}%` }} />
                     </span>
-                    <span className={`num ${styles.rowVal}`}>{gbp(final)}</span>
+                    <span
+                      className={`num ${styles.rowVal} ${idle ? styles.idle : ""}`}
+                      title={idle ? `Never traded, so the ${gbp(final)} was never at risk` : undefined}
+                    >
+                      {idle ? "No trades" : gbp(final)}
+                    </span>
                   </button>
                 </li>
               );
