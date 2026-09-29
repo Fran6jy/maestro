@@ -43,6 +43,16 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+
+def _auto_device() -> str:
+    """Pick CUDA when available, else CPU."""
+    try:
+        import torch
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        return "cpu"
+
+
 # Must match HMM feature set (both models see same inputs)
 TRANSFORMER_FEATURES = [
     "log_return_1",
@@ -86,7 +96,7 @@ class TransformerConfig:
     max_epochs:    int   = 50
     patience:      int   = 8       # early stopping patience
     warmup_steps:  int   = 200
-    device:        str   = "cpu"   # set to "cuda" if GPU available
+    device:        str   = field(default_factory=_auto_device)   # auto: cuda if available
 
 
 class PositionalEncoding(object):
@@ -428,8 +438,12 @@ class TransformerRegimeClassifier:
         ModelClass    = RegimeTransformer._get_model_class()
         obj.model     = ModelClass(n_features=len(TRANSFORMER_FEATURES), cfg=obj.cfg)
         obj.model.load_state_dict(data["model_state"])
+        # Re-resolve device for the current machine and move the model onto it,
+        # so a model trained/saved on GPU loads correctly on CPU and vice versa.
+        obj.cfg.device = _auto_device()
+        obj.model.to(obj.cfg.device)
         obj.fitted = True
-        logger.info("Transformer loaded from %s", path)
+        logger.info("Transformer loaded from %s (device=%s)", path, obj.cfg.device)
         return obj
 
     def _check_fitted(self) -> None:

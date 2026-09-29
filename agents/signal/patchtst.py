@@ -51,7 +51,7 @@ from sklearn.preprocessing import StandardScaler
 logger = logging.getLogger(__name__)
 
 # Uses the same feature set as TFT past features for consistency
-from maestro.agents.signal.tft_model import PAST_FEATURES, HORIZONS
+from maestro.agents.signal.tft_model import PAST_FEATURES, HORIZONS, _auto_device
 
 N_DIRECTIONS = 3    # {-1, 0, +1} encoded as {0, 1, 2} for CrossEntropy
 
@@ -80,7 +80,7 @@ class PatchTSTConfig:
     max_epochs:    int   = 50
     patience:      int   = 8
     label_smoothing: float = 0.1   # prevents overconfidence
-    device:        str   = "cpu"
+    device:        str   = field(default_factory=_auto_device)
 
     @property
     def n_patches(self) -> int:
@@ -483,6 +483,9 @@ class PatchTSTSignalModel:
             cfg        = data["config"],
         )
         obj.model.load_state_dict(data["model_state"])
+        # Re-resolve device for the current machine and move the model onto it.
+        obj.cfg.device = _auto_device()
+        obj.model.to(obj.cfg.device)
         obj.scaler    = data["scaler"]
         obj._n_features = data["n_features"]
         obj._n_horizons = data["n_horizons"]

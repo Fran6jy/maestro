@@ -52,6 +52,16 @@ from sklearn.preprocessing import StandardScaler
 
 logger = logging.getLogger(__name__)
 
+
+def _auto_device() -> str:
+    """Pick CUDA when available, else CPU. Lazy torch import keeps module load light."""
+    try:
+        import torch
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        return "cpu"
+
+
 # ── Feature definitions ───────────────────────────────────────────────────────
 # Observed past inputs (unknown in future)
 PAST_FEATURES = [
@@ -106,7 +116,7 @@ class TFTConfig:
     max_epochs:        int   = 60
     patience:          int   = 10
     gradient_clip:     float = 0.1
-    device:            str   = "cpu"
+    device:            str   = field(default_factory=_auto_device)
 
     # Regime conditioning
     regime_embed_dim:  int   = 8        # embedding size for regime categorical
@@ -625,10 +635,13 @@ class TFTSignalModel:
             cfg      = data["config"],
         )
         obj.model.load_state_dict(data["model_state"])
+        # Re-resolve device for the current machine and move the model onto it.
+        obj.cfg.device = _auto_device()
+        obj.model.to(obj.cfg.device)
         obj.scaler_past   = data["scaler_past"]
         obj.scaler_future = data["scaler_future"]
         obj.fitted = True
-        logger.info("TFT loaded from %s", path)
+        logger.info("TFT loaded from %s (device=%s)", path, obj.cfg.device)
         return obj
 
     def _check_fitted(self) -> None:

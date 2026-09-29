@@ -228,8 +228,16 @@ class HMMRegimeDetector:
         for s in range(self.cfg.n_states):
             mask = raw_states == s
             if mask.sum() == 0:
+                # Degenerate state with no assigned bars (happens with the
+                # 'diag' covariance fallback). Record zeroed stats so every
+                # state is present in _regime_stats — the label-assignment
+                # log loop and regime_summary() index all states.
                 state_means[s] = 0.0
                 state_vols[s]  = 0.0
+                self._regime_stats[s] = {
+                    "mean_return": 0.0, "mean_vol": 0.0,
+                    "n_bars": 0, "pct_bars": 0.0,
+                }
             else:
                 state_means[s] = float(X[mask, ret_col].mean())
                 state_vols[s]  = float(X[mask, vol_col].mean())
