@@ -253,11 +253,15 @@ def summarise(results: list[WindowResult], cost_pips: float, pip: float) -> dict
 
 # ── Walk-forward runner ───────────────────────────────────────────────────────
 def load_close(instrument: str, granularity: str = "M5") -> pd.Series:
-    """Read the feature parquet directly (avoids building credentialed connectors)."""
+    """Read the feature parquet directly (avoids building credentialed connectors).
+
+    The sealed holdout (maestro.data.holdout) is dropped unless unlocked.
+    """
+    from maestro.data.holdout import seal
     for name in (f"{instrument}_{granularity}_features.parquet", f"{instrument}_features.parquet"):
         path = DATA_DIR / name
         if path.exists():
-            return pd.read_parquet(path, columns=["close"])["close"].sort_index()
+            return seal(pd.read_parquet(path, columns=["close"])["close"].sort_index())
     raise FileNotFoundError(f"No feature parquet for {instrument} in {DATA_DIR}")
 
 
@@ -327,6 +331,7 @@ def run(instrument: str = "EUR_USD", max_splits: int | None = None,
         strategies: list[str] | None = None, out_dir: Path | None = None,
         refit_months: int = 1, train_months: int | None = None,
         external: dict[str, pd.Series] | None = None,
+        close: pd.Series | None = None,
         ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Score strategies over the walk-forward test months.
@@ -334,9 +339,11 @@ def run(instrument: str = "EUR_USD", max_splits: int | None = None,
     external : optional {name: position series} produced elsewhere (e.g. MAESTRO),
                covering the test bars. They are scored with exactly the same
                simulate/summarise code as the built-in strategies.
+    close    : optional price series to score on instead of the stored data
+               (used by the power test, which plants a known edge in prices).
     """
     pip = PIP_SIZE[instrument]
-    close = load_close(instrument)
+    close = load_close(instrument) if close is None else close
     returns = np.log(close / close.shift(1))
     names = list(strategies or STRATEGIES)
     external = external or {}
@@ -420,7 +427,12 @@ def main() -> None:
                    help="retrain every N test months (default 1)")
     p.add_argument("--train-months", type=int, default=None,
                    help="rolling training window in months (default: all history)")
+    p.add_argument("--holdout", action="store_true",
+                   help="unlock the sealed holdout (maestro.data.holdout): final confirmation run only")
     args = p.parse_args()
+    if args.holdout:
+        from maestro.data.holdout import unlock
+        unlock()
     pooled, per_split = run(args.instrument, args.max_splits, args.strategies,
                             refit_months=args.refit_months, train_months=args.train_months)
     _print_report(pooled, per_split["split_id"].nunique())

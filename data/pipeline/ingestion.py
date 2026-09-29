@@ -281,7 +281,8 @@ class DataPipeline:
                 f"Dataset not found: {path}\n"
                 f"Run DataPipeline().run_full() to build it first."
             )
-        df = pd.read_parquet(path)
+        from maestro.data.holdout import seal
+        df = seal(pd.read_parquet(path).sort_index())
         if start:
             df = df[df.index >= pd.Timestamp(start, tz="UTC")]
         if end:
