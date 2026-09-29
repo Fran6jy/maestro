@@ -3,6 +3,9 @@ import ridge from "@/data/ridge.json";
 import msc from "@/data/msc.json";
 
 export type StrategyKey =
+  | "maestro_top10"
+  | "maestro_ungated"
+  | "maestro_gated"
   | "logreg_lag5"
   | "bollinger_20_2"
   | "contrarian_3"
@@ -15,10 +18,10 @@ export type StrategyKey =
 export interface Strategy {
   key: StrategyKey;
   label: string;
-  group: "msc" | "ref";
+  group: "maestro" | "msc" | "ref";
   desc: string;
-  hit: number;
-  hitMsc: number;
+  hit: number | null;       // null when a strategy never traded
+  hitMsc: number | null;
   trades: number;
   exposure: number;
   grossPerTrade: number;

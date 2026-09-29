@@ -6,8 +6,12 @@ The site never computes results of its own: it only re-scales these numbers
 (e.g. the cost slider), so every figure on it traces back to
 backtesting/baselines.py.
 
-    python -m maestro.backtesting.baselines          # produce results first
+    python -m maestro.backtesting.maestro_runner     # produce results first (baselines + MAESTRO)
     python -m maestro.demo.export_web_data           # writes web/src/data/*.json
+
+By default it reads the MAESTRO run's scores folder, which holds every
+baseline and both MAESTRO variants scored together; if that run has not
+finished it falls back to the baselines alone. `--results DIR` overrides both.
 
 Cost slider maths
 -----------------
@@ -19,13 +23,14 @@ and monthly pips as gross_pips - trades * c.
 """
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-from maestro.backtesting.baselines import OUTPUT_DIR, load_close
+from maestro.backtesting.baselines import OUTPUT_DIR, design_tag, load_close
 from maestro.demo.findings.build_page import STRATEGY_TEXT, msc_replication
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -33,6 +38,24 @@ WEB_DATA = ROOT / "web" / "src" / "data"
 SCALE = 1e7          # daily log returns stored as integers (1e-7 precision)
 RIDGE_DAYS = 150     # intraday paths used by the hero visual
 RIDGE_POINTS = 72    # 20-minute resolution per day
+
+DESIGN = design_tag(refit_months=3, train_months=12)   # the design the site reports
+
+MAESTRO_TEXT = {
+    "maestro_top10":   ("MAESTRO, most confident 10%", "maestro",
+                        "The multi-agent system: it reads the market regime, forecasts the next 30 minutes "
+                        "with two deep-learning models, and trades only its 10% most confident calls."),
+    "maestro_ungated": ("MAESTRO, every signal", "maestro",
+                        "The same forecasts with no confidence filter, so it acts on every up or down call."),
+    "maestro_gated":   ("MAESTRO as designed", "maestro",
+                        "Trades only when confidence clears the thresholds it was designed with. In 39 months "
+                        "it never did, so it never traded."),
+}
+
+
+def _num(v: float, digits: int = 4) -> float | None:
+    """JSON has no NaN: a strategy that never traded has no hit rate."""
+    return None if pd.isna(v) else round(float(v), digits)
 
 
 def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
@@ -52,16 +75,18 @@ def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
                   for r in months.itertuples()]
 
     strategies = []
-    for key, (label, group, desc) in STRATEGY_TEXT.items():
+    for key, (label, group, desc) in {**MAESTRO_TEXT, **STRATEGY_TEXT}.items():
+        if key not in net_row.index:
+            continue
         g, n = gross_row.loc[key], net_row.loc[key]
         sp = per_split[per_split["strategy"] == key].sort_values("split_id")
         strategies.append({
             "key": key, "label": label, "group": group, "desc": desc,
-            "hit": round(float(n["hit_directional"]), 4),
-            "hitMsc": round(float(n["hit_msc_style"]), 4),
+            "hit": _num(n["hit_directional"]),
+            "hitMsc": _num(n["hit_msc_style"]),
             "trades": int(n["n_trades"]),
-            "exposure": round(float(n["exposure"]), 4),
-            "grossPerTrade": round(float(g["net_pips_per_trade"]), 4),
+            "exposure": _num(n["exposure"]) or 0.0,
+            "grossPerTrade": _num(g["net_pips_per_trade"]) or 0.0,
             "daily": {
                 "gross": [int(round(v * SCALE)) for v in daily[f"{key}|gross"]],
                 "ref":   [int(round(v * SCALE)) for v in daily[f"{key}|spread"]],
@@ -74,6 +99,7 @@ def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
 
     return {
         "instrument": instrument,
+        "design": results.name if results.name != "scores" else results.parent.name,
         "refCostPips": ref_cost,
         "scale": SCALE,
         "dates": [d.strftime("%Y-%m-%d") for d in daily.index],
@@ -97,8 +123,16 @@ def export_ridge(close: pd.Series, start: str, end: str) -> dict:
     return {"days": [d for d, _ in chosen], "paths": [p for _, p in chosen]}
 
 
+def default_results() -> Path:
+    maestro = OUTPUT_DIR / "maestro" / DESIGN / "scores"
+    return maestro if (maestro / "EUR_USD_baselines_pooled.csv").exists() else OUTPUT_DIR / "baselines" / DESIGN
+
+
 def main() -> None:
-    results = OUTPUT_DIR / "baselines"
+    p = argparse.ArgumentParser(description="Export tested results for the website")
+    p.add_argument("--results", type=Path, default=None, help="folder written by baselines.run")
+    results = p.parse_args().results or default_results()
+    print(f"reading {results}")
     close = load_close("EUR_USD")
     data = export_results(results)
     ridge = export_ridge(close, data["dates"][0], data["dates"][-1])
@@ -107,7 +141,7 @@ def main() -> None:
     WEB_DATA.mkdir(parents=True, exist_ok=True)
     for name, obj in (("results", data), ("ridge", ridge), ("msc", msc)):
         path = WEB_DATA / f"{name}.json"
-        path.write_text(json.dumps(obj, separators=(",", ":")), encoding="utf-8")
+        path.write_text(json.dumps(obj, separators=(",", ":"), allow_nan=False), encoding="utf-8")
         print(f"wrote {path} ({path.stat().st_size / 1024:.0f} KB)")
     print(f"  {len(data['strategies'])} strategies, {len(data['dates'])} days, "
           f"{len(data['months'])} months, {len(ridge['paths'])} ridge days")

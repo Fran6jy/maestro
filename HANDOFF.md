@@ -17,55 +17,74 @@ If a task doesn't serve it, it is future work.
 | Area | Result | Where |
 |---|---|---|
 | MSc re-examined | 37.56% / 0.599 come from two unrelated tests; the regression re-runs at 46.6% | README, site `/method` |
-| Shared evaluator | One scorer for every strategy, 39 expanding walk-forward months, 5-day embargo, 0.8 pip round trip | `backtesting/baselines.py` |
-| No-look-ahead tests | 8 tests, all passing | `tests/test_baselines.py` |
+| Shared evaluator | One scorer for every strategy, 39 walk-forward months, quarterly retraining on the latest 12 months, 5-day embargo, 0.8 pip round trip | `backtesting/baselines.py` |
+| No-look-ahead tests | 13 tests, all passing (scorer, retraining plan, MAESTRO positions) | `tests/test_baselines.py` |
 | MSc strategies rebuilt | All lose after costs; only buy and hold is positive | README table |
-| MAESTRO edge check | Pooled directional hit 50.82% over 25,198 calls (z = +2.61): statistically detectable, economically too small (breakeven needs ~58–68% at 0.8–1.8 pips) | `modal_edge.py` |
+| MAESTRO vs baselines | No edge before or after costs; see below | `backtesting/maestro_runner.py` |
 | Paper-trading groundwork | Instrument specs, causal portfolio ledger, paper broker/engine, allocator, read-only OANDA client — 35 tests pass | `trader/`, `backtesting/portfolio_ledger.py` |
 | Public website | Live, interactive, built only from exported results | [maestro-research.vercel.app](https://maestro-research.vercel.app), `web/` |
 
-## What is next: Chapter 7, MAESTRO vs the baselines
+## Chapter 7 result: MAESTRO vs the baselines (done)
 
-Score MAESTRO with the **same** evaluator as the MSc strategies and add it to the table and the site.
+Every model is retrained each quarter on the latest 12 months (13 retrainings, 39 test months
+traded blind), scored by the same code at 0.8 pips per round trip.
 
-1. Save MAESTRO's per-bar signals for every walk-forward split (the Modal run only returned hit rates).
-2. Score two versions: **as designed** (trades only above its confidence threshold) and **always in the
-   market** (the like-for-like comparison with the MSc models).
-3. Compare against logistic regression and buy and hold after costs.
-4. Re-export data and redeploy the website.
+| Version (fixed before results) | Hit | Trades | Sharpe gross | Sharpe net | £10k becomes |
+|---|---:|---:|---:|---:|---:|
+| As designed (per-regime confidence thresholds) | n/a | 0 | 0.00 | 0.00 | £10,000 |
+| Most confident 10% (cut-off from previous 5 days) | 50.0% | 3,539 | −0.46 | −3.13 | £7,405 |
+| Every signal | 49.7% | 4,949 | −0.82 | −3.67 | £6,298 |
+| Logistic regression (reference) | 50.9% | 50,915 | 1.92 | −11.94 | £399 |
+| Buy and hold (reference) | 50.4% | 39 | 0.27 | 0.26 | £10,667 |
 
-### Decision still open: how to run it
+MAESTRO has no edge even before costs. It loses less than the busy MSc models only because it trades
+less; moving-average and Bollinger still beat it. As designed, it never cleared its confidence thresholds.
 
-There is **no budget for Modal**, so the run goes on the laptop GPU (RTX 3070 Ti, 8 GB, ~7× faster
-than CPU once CUDA PyTorch is installed).
+Bugs found and fixed on the way (they belong in the thesis methods chapter):
 
-| Option | Laptop time | Consequence |
-|---|---|---|
-| Retrain every quarter on the latest 12 months | ~3 hours | Re-score the MSc strategies the same way (seconds) and update site copy |
-| Keep monthly retrains on all history | ~30–40 hours | No design change; must be resumable across several nights |
+- **TFT collapse**: trained on raw 5-minute returns (~1e-4), it output one constant for every bar,
+  so MAESTRO said BUY on 100% of bars. Targets are now scaled per horizon (`target_scale`).
+- **TFT horizons**: "horizon 6" read the single-bar forecast at step 3. Targets are now cumulative
+  and horizon h reads step h−1.
+- **One-bar lag**: TFT and PatchTST forecasts were stamped a bar late (conservative, not a leak).
+- **PatchTST speed**: per-channel Python loop batched; identical output, 11× faster.
+- **Data gaps**: ~0.3% of bars have a NaN candle feature; positions carry through them (≤ 1 hour)
+  instead of paying fake round trips.
 
-Whichever is chosen, the runner should save each split as it finishes so a sleep or crash does not
-lose work (the first expanding-window laptop run was killed mid-way).
+The earlier Modal "edge" figure (50.82% over 25,198 calls) came from the buggy TFT. Don't cite it.
+
+Outputs: `C:\tmp\maestro_outputs\maestro\refit3_roll12\` (per-block signals, `scores/`, run log).
+efit3_roll12\` (per-block signals, `scores/`, run log).
+
+## What is next: Chapter 8, live practice trial
+
+MSc strategies and MAESTRO side by side on the OANDA **practice** account for 4–8 weeks, with daily
+reconciliation of live decisions and fills against the backtest. Open questions to settle first:
+which MAESTRO version to run live (most confident 10% is the natural choice), and whether to keep
+the confidence-bucket and ablation analyses in Chapter 7.
 
 ## Environment
 
 - **Run from the folder above the repo** (`C:\Users\fran6\Downloads`); the package imports as `maestro`.
-- **venv**: `maestro/venv` was recreated with core packages only (numpy, pandas 3, scikit-learn,
-  scipy, pyarrow, pyyaml, python-dotenv, pytest). Model training also needs:
+- **venv**: `maestro/venv` has the core packages (numpy, pandas 3, scikit-learn, scipy, pyarrow,
+  pyyaml, python-dotenv, pytest) plus CUDA PyTorch, hmmlearn and statsmodels. To rebuild the extras:
   ```bash
   maestro/venv/Scripts/pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
   maestro/venv/Scripts/pip install hmmlearn statsmodels
   ```
 - **Data**: `C:\tmp\maestro_data\EUR_USD_features.parquet` (restored from the Modal volume
   `maestro-data`). Earlier saved models and outputs under `C:\tmp` were lost and are regenerable.
-- **Evaluator outputs**: `C:\tmp\maestro_outputs\baselines\`.
+- **Evaluator outputs**: `C:\tmp\maestro_outputs\baselines\<design>\` and `C:\tmp\maestro_outputs\maestro\<design>\`
+  (design tags such as `refit3_roll12`; the site reads the MAESTRO run's `scores\` folder).
 - **Device**: model configs auto-select CUDA when available and reload saved models onto the current device.
 
 ## Common commands
 
 ```bash
-python -m maestro.backtesting.baselines             # re-score the MSc strategies
-python -m pytest maestro/tests                      # full test suite
+python -m maestro.backtesting.maestro_runner --refit-months 3 --train-months 12   # ~4 h on the GPU, resumable
+python -m maestro.backtesting.maestro_runner --score-only                         # re-score saved blocks
+python -m maestro.backtesting.baselines --refit-months 3 --train-months 12        # baselines only
+python -m pytest maestro/tests/test_baselines.py    # no-look-ahead tests (tests/smoke_test.py is a script, not pytest)
 python -m maestro.demo.export_web_data              # refresh web/src/data/*.json
 cd maestro/web && npm run build && vercel deploy --prod --yes   # redeploy the site
 ```

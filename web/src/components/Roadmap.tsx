@@ -17,12 +17,12 @@ const ITEMS = [
     body: "Every MSc strategy loses money after costs. Buy and hold is the only positive result.",
   },
   {
-    status: ["pill-next", "Next"],
+    status: ["pill-done", "Done"],
     title: "MAESTRO vs the baselines",
-    body: "The six-agent system goes through the same months, costs and scoring code. It has to beat them after costs.",
+    body: "Same months, costs and scoring code. MAESTRO's calls are no better than a coin flip, even before costs. It loses less than the busiest MSc models only because it trades less. Buy and hold still wins.",
   },
   {
-    status: ["pill-plan", "Planned"],
+    status: ["pill-next", "Next"],
     title: "Live practice trial",
     body: "MAESTRO and the MSc strategies trade side by side on an OANDA practice account, checked daily against the backtest. No real money.",
   },

@@ -21,9 +21,15 @@ const PRESETS = [
   { cost: 1.5, label: "Spread + slippage" },
 ];
 const HOLD = equity(dailyNet(STRATEGY.buy_hold, RESULTS.refCostPips));
+const GROUPS = [
+  { id: "maestro", label: "MAESTRO" },
+  { id: "msc", label: "From my MSc" },
+  { id: "ref", label: "Reference points" },
+].filter((g) => RESULTS.strategies.some((st) => st.group === g.id));
+const FIRST: StrategyKey = STRATEGY.maestro_top10 ? "maestro_top10" : "logreg_lag5";
 
 export default function StrategyLab() {
-  const [key, setKey] = useState<StrategyKey>("logreg_lag5");
+  const [key, setKey] = useState<StrategyKey>(FIRST);
   const [cost, setCost] = useState(RESULTS.refCostPips);
   const s = STRATEGY[key];
   const costLabel = `${cost.toFixed(2)} pips`;
@@ -70,11 +76,11 @@ export default function StrategyLab() {
         <div className={`panel panel-glow ${styles.lab}`}>
           <fieldset className={styles.picker}>
             <legend className="eyebrow">Strategy</legend>
-            {(["msc", "ref"] as const).map((group) => (
-              <div key={group} className={styles.group}>
-                <p className={styles.groupLabel}>{group === "msc" ? "From my MSc" : "Reference points"}</p>
+            {GROUPS.map((group) => (
+              <div key={group.id} className={styles.group}>
+                <p className={styles.groupLabel}>{group.label}</p>
                 {RESULTS.strategies
-                  .filter((st) => st.group === group)
+                  .filter((st) => st.group === group.id)
                   .map((st) => {
                     const f = board.find((b) => b.st.key === st.key)!.final;
                     return (
@@ -191,7 +197,7 @@ export default function StrategyLab() {
               </div>
             </dl>
             <p className={styles.paid}>
-              {s.trades > 100
+              {key !== "buy_hold"
                 ? `${int(s.trades)} trades × ${cost.toFixed(2)} pips = ${int(paidPips)} pips paid to the market.`
                 : `Buy and hold trades once a month, so costs barely touch it.`}
             </p>

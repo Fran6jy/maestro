@@ -24,11 +24,11 @@ question with evidence an examiner cannot pick apart. A clear "no" is a valid re
 | 1 | Introduction | Research question above | To write |
 | 2 | Literature review | ML in trading; backtest overfitting (López de Prado; Bailey & López de Prado); multi-agent systems; regime detection; explainable AI | To write |
 | 3 | **Revisiting the MSc** | What the MSc claimed; why its figures don't reproduce (regression re-run on the same window gives 46.6% vs the reported 37.56%; the metric counts flat bars as misses; Sharpe 0.599 came from a separate daily SMA test; scored in-sample; no costs; live results were a handful of trades) | Done — see `memory/msc_baseline.md`, replication scripts |
-| 4 | **Evaluation framework** | 39 expanding walk-forward splits with embargo; one shared evaluator (`backtesting/baselines.py`); explicit timing convention; tests proving no look-ahead (`tests/test_baselines.py`); cost model; metric definitions | Done |
+| 4 | **Evaluation framework** | 39 walk-forward test months, retrained quarterly on the latest 12 months, with embargo; one shared evaluator (`backtesting/baselines.py`); explicit timing convention; tests proving no look-ahead (`tests/test_baselines.py`); cost model; metric definitions | Done |
 | 5 | **Baselines under the framework** | MSc strategies rebuilt and scored: all 48–51% hit rate; ML baselines have positive gross Sharpe but lose after costs; only buy-and-hold is positive | Done — `C:\tmp\maestro_outputs\baselines\` |
-| 6 | **MAESTRO** | Architecture (regime, signal, risk, execution, sentiment, orchestrator); confidence-calibration fix; explainability layer | Built |
-| 7 | **MAESTRO vs baselines** | MAESTRO through the same evaluator; comparison with logistic regression and buy-and-hold; confidence-bucket analysis; ablations (remove regime / risk / orchestrator) | **Next** |
-| 8 | **Live forward test** | MSc strategies and MAESTRO side by side on the OANDA practice account for 4–8 weeks; daily reconciliation of live decisions and fills against the backtest | Pending |
+| 6 | **MAESTRO** | Architecture (regime, signal, risk, execution, sentiment, orchestrator); confidence-calibration fix; TFT fixes (target scaling, horizon indexing, one-bar lag); explainability layer | Built |
+| 7 | **MAESTRO vs baselines** | Same evaluator, three versions fixed before results: as designed never trades (confidence never clears its thresholds); most confident 10% hits 50.0%, Sharpe −0.46 gross / −3.13 net; every signal 49.7%, −0.82 / −3.67. No edge even before costs, unlike the simple models; loses less than logistic regression only by trading less. Still to add: confidence-bucket analysis, ablations | Core result done |
+| 8 | **Live forward test** | MSc strategies and MAESTRO side by side on the OANDA practice account for 4–8 weeks; daily reconciliation of live decisions and fills against the backtest | **Next** |
 | 9 | Discussion and conclusion | Statistical vs economic significance; what the extra complexity bought (or didn't); limitations; future work | To write |
 
 ## Parked as future work

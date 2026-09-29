@@ -19,25 +19,32 @@ They came from two unrelated experiments: a linear regression scored on the same
 on, and a separate daily moving-average strategy. Re-running the regression on the same month gives
 46.6%; the original figure mostly reflects how flat price bars were scored.
 
-**Rebuilt under one evaluator, no MSc strategy survives trading costs.** EUR/USD 5-minute bars,
-39 walk-forward months (Jan 2023 to Mar 2026), 0.8 pips per round trip, £10,000 start:
+**Rebuilt under one evaluator, nothing beats buy and hold after costs, MAESTRO included.**
+EUR/USD 5-minute bars, 39 walk-forward test months (Jan 2023 to Mar 2026), every model retrained
+each quarter on the latest 12 months, 0.8 pips per round trip, £10,000 start:
 
 | Strategy | Right about next move | Trades | Sharpe before costs | Sharpe after costs | £10,000 becomes |
 |---|---:|---:|---:|---:|---:|
 | Buy and hold (benchmark) | 50.4% | 39 | 0.27 | **0.26** | **£10,667** |
+| MAESTRO as designed | n/a | 0 | 0.00 | 0.00 | £10,000 |
 | Moving-average crossover 20/200 | 49.7% | 2,089 | −0.04 | −0.67 | £8,517 |
 | Bollinger bands 20 / 2σ | 51.2% | 7,990 | 1.95 | −1.28 | £7,963 |
-| Logistic regression, 5 moves | 51.1% | 63,738 | 2.62 | −14.82 | £188 |
+| MAESTRO, most confident 10% | 50.0% | 3,539 | −0.46 | −3.13 | £7,405 |
+| MAESTRO, every signal | 49.7% | 4,949 | −0.82 | −3.67 | £6,298 |
+| Logistic regression, 5 moves | 50.9% | 50,915 | 1.92 | −11.94 | £399 |
 | Contrarian, 3 bars | 50.9% | 63,239 | 2.36 | −15.35 | £182 |
-| Linear regression, 5 moves | 50.8% | 114,572 | 1.91 | −23.25 | £3.86 |
-| Linear regression, 1 move | 50.8% | 116,552 | 1.36 | −23.98 | £3.03 |
-| Coin flip (sanity check) | 50.1% | 115,108 | 0.31 | −24.66 | £2.51 |
+| Linear regression, 5 moves | 50.8% | 106,835 | 2.12 | −21.71 | £6.86 |
+| Linear regression, 1 move | 50.7% | 116,552 | 0.64 | −24.09 | £2.49 |
+| Coin flip (sanity check) | 49.9% | 115,013 | −0.01 | −24.33 | £2.33 |
 
-Short-horizon EUR/USD has a real, small tendency to reverse (positive Sharpe before costs), but the
-edge per trade is far smaller than the spread. Only buy and hold ends positive.
+Short-horizon EUR/USD has a real, small tendency to reverse: the simple models show a positive
+Sharpe before costs. That edge per trade is far smaller than the spread, so only buy and hold ends
+positive.
 
-**Next:** MAESTRO's six-agent system goes through exactly the same evaluator. To count as progress it
-has to beat the logistic regression and buy and hold after costs. A clear "no" is a valid result.
+**MAESTRO has no edge even before costs.** Its forecasts are right 49.7–50.0% of the time and its
+Sharpe before costs is negative. It loses less than the busy MSc models only because it trades far
+less. As designed, its confidence never cleared the thresholds it was built with, so it never traded.
+The three ways of turning its forecasts into trades were fixed before any result was seen.
 
 ## Status
 
@@ -46,8 +53,8 @@ has to beat the logistic regression and buy and hold after costs. A clear "no" i
 | Re-examine the MSc figures | Done |
 | Leakage-free, cost-aware evaluator with look-ahead tests | Done |
 | MSc strategies rebuilt and scored | Done |
-| MAESTRO scored on the same evaluator | Next |
-| Side-by-side live trial on an OANDA **practice** account | Planned |
+| MAESTRO scored on the same evaluator | Done: no edge before or after costs |
+| Side-by-side live trial on an OANDA **practice** account | Next |
 | Cross-asset extension (gold, S&P 500) | Later |
 
 ## How MAESTRO works
@@ -88,12 +95,16 @@ python -m venv maestro/venv
 maestro/venv/Scripts/pip install -r maestro/requirements.txt
 ```
 
+Training MAESTRO needs CUDA PyTorch (`pip install torch==2.10.0 --index-url
+https://download.pytorch.org/whl/cu128`, plus `hmmlearn statsmodels`). The full run takes about four
+hours on a laptop RTX 3070 Ti and saves each quarterly block as it finishes, so it can resume.
+
 Price data (OANDA EUR/USD 5-minute features) is not in the repository. Point
 `MAESTRO_DATA_DIR` at a folder containing `EUR_USD_features.parquet` (a `.env` file works).
 
 ```bash
-python -m maestro.backtesting.baselines            # score every MSc strategy
-python -m pytest maestro/tests                     # includes the no-look-ahead tests
+python -m maestro.backtesting.maestro_runner --refit-months 3 --train-months 12   # train MAESTRO, score everything
+python -m pytest maestro/tests/test_baselines.py   # the no-look-ahead tests
 python -m maestro.demo.export_web_data             # rebuild the website's data
 ```
 

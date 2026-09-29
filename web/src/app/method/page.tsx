@@ -25,34 +25,35 @@ const SECTIONS = [
 ];
 
 function WalkForward() {
-  const rows = 7;
+  const rows = 6;
   const W = 720;
   const rowH = 30;
   const H = rows * rowH + 34;
   const left = 110;
-  const unit = (W - left - 16) / (rows + 6);
+  const unit = (W - left - 16) / (rows + 4);   // one unit = three months
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className={styles.wf} role="img"
-      aria-label="Each test month is traded only after training on all earlier data, with a five-day gap between training and testing.">
+      aria-label="Every three months the models are retrained on the latest twelve months of data, then trade the next three months blind, with a five-day gap between training and testing.">
       {Array.from({ length: rows }).map((_, i) => {
         const y = 10 + i * rowH;
-        const trainW = unit * (5 + i);
+        const trainX = left + unit * i;
+        const trainW = unit * 4;
         return (
           <g key={i}>
-            <text x={0} y={y + 15} className={styles.wfLabel}>Window {i + 1}</text>
-            <rect x={left} y={y} width={trainW} height={18} rx={3} className={styles.wfTrain} />
-            <rect x={left + trainW + 3} y={y} width={5} height={18} className={styles.wfGap} />
-            <rect x={left + trainW + 11} y={y} width={unit - 2} height={18} rx={3} className={styles.wfTest} />
+            <text x={0} y={y + 15} className={styles.wfLabel}>Retrain {i + 1}</text>
+            <rect x={trainX} y={y} width={trainW} height={18} rx={3} className={styles.wfTrain} />
+            <rect x={trainX + trainW + 3} y={y} width={5} height={18} className={styles.wfGap} />
+            <rect x={trainX + trainW + 11} y={y} width={unit - 2} height={18} rx={3} className={styles.wfTest} />
           </g>
         );
       })}
       <g transform={`translate(${left}, ${rows * rowH + 20})`}>
         <rect width={14} height={10} rx={2} className={styles.wfTrain} />
-        <text x={20} y={9} className={styles.wfKey}>Training data (grows each month)</text>
+        <text x={20} y={9} className={styles.wfKey}>Latest 12 months of training data</text>
         <rect x={270} width={6} height={10} className={styles.wfGap} />
         <text x={282} y={9} className={styles.wfKey}>5-day gap</text>
         <rect x={370} width={14} height={10} rx={2} className={styles.wfTest} />
-        <text x={390} y={9} className={styles.wfKey}>Test month, traded blind</text>
+        <text x={390} y={9} className={styles.wfKey}>3 test months, traded blind</text>
       </g>
     </svg>
   );
@@ -97,10 +98,12 @@ export default function MethodPage() {
           <section id="walk-forward">
             <h2>Walk-forward testing</h2>
             <p>
-              A strategy is trained on everything before a test month, then trades that month without
-              having seen it. The window then moves forward one month and the process repeats, 39 times.
-              A five-day gap separates training from testing, so no training label can overlap a test
-              price.
+              Every three months, each model is retrained on the latest twelve months of data, then
+              trades the next three months without having seen them. The window then moves forward
+              three months and the process repeats: 13 retrainings, 39 test months, each scored on its
+              own. A five-day gap separates training from testing, so no training label can overlap a
+              test price. Rules-based strategies such as the moving-average crossover have nothing to
+              train, so they simply trade every month.
             </p>
             <figure className={`panel ${styles.figure}`}>
               <WalkForward />
@@ -128,7 +131,9 @@ export default function MethodPage() {
             <ul>
               <li>a strategy that secretly reads the next bar scores 100%, proving the scorer would catch it;</li>
               <li>a signal built from the current bar&rsquo;s own move scores about 50% on random data;</li>
-              <li>the regression models only ever learn from their training window.</li>
+              <li>the regression models only ever learn from their training window;</li>
+              <li>no retraining ever uses data from the months it is about to trade;</li>
+              <li>MAESTRO&rsquo;s confidence cut-off only uses confidence from earlier bars.</li>
             </ul>
             <p>
               See <a href={`${REPO}/tests/test_baselines.py`} target="_blank" rel="noreferrer">tests/test_baselines.py</a>.
@@ -159,6 +164,14 @@ export default function MethodPage() {
               bands use 20 bars at 2 standard deviations. The regressions use the latest 1 or 5 price
               moves. Buy and hold buys at the start of each test month and sells at the end.
             </p>
+            <p>
+              MAESTRO forecasts the next 30 minutes with its regime, TFT and PatchTST agents, retrained
+              on the same schedule on a laptop GPU, with two months of each training window held back to
+              stop training early. How forecasts become trades is a design choice, so three versions
+              were fixed before any result was seen: <strong>as designed</strong> (trade only above the
+              confidence thresholds MAESTRO was built with), <strong>most confident 10%</strong> (the
+              cut-off taken from the previous five trading days), and <strong>every signal</strong>.
+            </p>
           </section>
 
           <section id="msc">
@@ -179,6 +192,10 @@ export default function MethodPage() {
               <li>One currency pair so far. Other markets may behave differently.</li>
               <li>Costs are a fixed spread per trade. Real spreads widen around news and overnight.</li>
               <li>The MSc ran its moving-average strategy on daily bars; here it runs on 5-minute bars.</li>
+              <li>MAESTRO&rsquo;s first retraining had only seven weeks of usable data, because two
+                of its inputs need eight months of history before they exist.</li>
+              <li>MAESTRO&rsquo;s model settings were not tuned. Tuning them on these months would
+                have let the test leak into the design.</li>
               <li>This is a historical simulation. The live practice-account trial will measure how far reality differs.</li>
             </ul>
           </section>
@@ -186,12 +203,14 @@ export default function MethodPage() {
           <section id="reproduce">
             <h2>Reproduce it</h2>
             <p>From a copy of the repository, with the price data in place:</p>
-            <pre className={styles.code}><code>{`python -m maestro.backtesting.baselines
+            <pre className={styles.code}><code>{`python -m maestro.backtesting.maestro_runner --refit-months 3 --train-months 12
 python -m pytest maestro/tests/test_baselines.py
 python -m maestro.demo.export_web_data`}</code></pre>
             <p>
-              The last command rebuilds the data this site is made from. Source:{" "}
-              <a href={`${REPO}/backtesting/baselines.py`} target="_blank" rel="noreferrer">backtesting/baselines.py</a>.
+              The first command trains MAESTRO (about four hours on a laptop GPU) and scores it alongside
+              every baseline; the last rebuilds the data this site is made from. Source:{" "}
+              <a href={`${REPO}/backtesting/baselines.py`} target="_blank" rel="noreferrer">backtesting/baselines.py</a>{" "}
+              and <a href={`${REPO}/backtesting/maestro_runner.py`} target="_blank" rel="noreferrer">backtesting/maestro_runner.py</a>.
             </p>
             <p className={styles.back}>
               <Link href="/#lab" className="btn btn-ghost">Back to the Strategy Lab</Link>

@@ -6,7 +6,8 @@ export function gbp(v: number): string {
   return "£" + v.toFixed(2);
 }
 
-export function pct(v: number, digits = 1): string {
+export function pct(v: number | null, digits = 1): string {
+  if (v === null || !Number.isFinite(v)) return "n/a";
   return (v * 100).toFixed(digits) + "%";
 }
 
