@@ -48,10 +48,11 @@ VAL_MONTHS = 2          # last part of each training window used for early stopp
 HORIZON = 6             # primary forecast horizon in bars (30 minutes)
 EPOCHS = 40             # same settings as the Modal edge run
 WARMUP_BARS = 400       # history fed before each test block so sequence models have context
-# --fast: the TFT is the bottleneck (LSTMs over 120-bar windows). A 4x batch with the
-# learning rate scaled by sqrt(4), plus bf16 mixed precision. Checked against the
-# standard settings before use (validation loss, and the power test's planted edge).
-FAST_TFT = {"batch_size": 256, "lr": 2e-3, "amp": True}
+# --fast: the TFT is the bottleneck (LSTMs over 120-bar windows). A 4x batch cuts its
+# time per epoch ~3.7x; with the learning rate unchanged its validation loss stays within
+# ~0.6% of the standard settings (a 2e-3 rate, or bf16, made it clearly worse, and bf16
+# was also slower on this GPU). Epochs are cheap, so early stopping gets more patience.
+FAST_TFT = {"batch_size": 256, "patience": 10}
 
 
 def load_features(instrument: str) -> pd.DataFrame:
@@ -95,8 +96,8 @@ def train_and_predict(df: pd.DataFrame, train_idx: pd.Index, test_idx: pd.Index,
 
     signal = SignalAgent(
         instrument=instrument, primary_horizon=HORIZON,
-        tft_config=TFTConfig(seq_len=120, pred_len=max(HORIZONS), max_epochs=epochs, patience=6,
-                             **(FAST_TFT if fast else {})),
+        tft_config=TFTConfig(seq_len=120, pred_len=max(HORIZONS), max_epochs=epochs,
+                             **{"patience": 6, **(FAST_TFT if fast else {})}),
         ptst_config=PatchTSTConfig(seq_len=128, max_epochs=epochs, patience=6),
     )
     t0 = time.time()
