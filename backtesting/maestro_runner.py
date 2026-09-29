@@ -51,10 +51,12 @@ WARMUP_BARS = 400       # history fed before each test block so sequence models 
 
 
 def load_features(instrument: str) -> pd.DataFrame:
+    """Full feature parquet, with the sealed holdout dropped unless unlocked."""
+    from maestro.data.holdout import seal
     for name in (f"{instrument}_M5_features.parquet", f"{instrument}_features.parquet"):
         path = DATA_DIR / name
         if path.exists():
-            return pd.read_parquet(path).sort_index()
+            return seal(pd.read_parquet(path).sort_index())
     raise FileNotFoundError(f"No feature parquet for {instrument} in {DATA_DIR}")
 
 
@@ -144,25 +146,47 @@ def main() -> None:
     p.add_argument("--epochs", type=int, default=None, help=f"max training epochs (default {EPOCHS}, smoke 1)")
     p.add_argument("--smoke", action="store_true", help="first block only, 1 epoch unless --epochs is given")
     p.add_argument("--score-only", action="store_true", help="skip training; score the blocks already saved")
+    p.add_argument("--holdout", action="store_true",
+                   help="unlock the sealed holdout (maestro.data.holdout): final confirmation run only")
     args = p.parse_args()
+    if args.holdout:
+        from maestro.data.holdout import unlock
+        unlock()
 
     train_months = None if args.expanding else args.train_months
     epochs = args.epochs or (1 if args.smoke else EPOCHS)
     tag = design_tag(args.refit_months, train_months)
     out_dir = OUTPUT_DIR / "maestro" / (tag + ("_smoke" if args.smoke else ""))
+
+    pooled = run_design(load_close(args.instrument), out_dir, args.instrument,
+                        lambda: load_features(args.instrument), args.refit_months, train_months,
+                        epochs, max_blocks=1 if args.smoke else None, train=not args.score_only)
+    if pooled is not None:
+        print_summary(pooled)
+
+
+def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit_months: int = 3,
+               train_months: int | None = 12, epochs: int = EPOCHS, max_blocks: int | None = None,
+               train: bool = True) -> pd.DataFrame | None:
+    """Train MAESTRO block by block (resumable), then score it with every baseline.
+
+    features : callable returning the feature table, only called if a block needs training.
+    Returns the pooled scores, or None if some blocks are still missing.
+    """
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    close = load_close(args.instrument)
-    blocks = refit_plan(close, args.refit_months, train_months)
-    if args.smoke:
-        blocks = blocks[:1]
+    blocks = refit_plan(close, refit_months, train_months)
+    full = len(blocks)
+    if max_blocks:
+        blocks = blocks[:max_blocks]
     logger.info("Design %s: %d retraining blocks, %d test months, output %s",
-                tag, len(blocks), sum(len(b.splits) for b in blocks), out_dir)
+                design_tag(refit_months, train_months), len(blocks),
+                sum(len(b.splits) for b in blocks), out_dir)
 
-    if not args.score_only:
+    todo = [b for b in blocks if not (out_dir / f"block_{b.block_id:02d}.parquet").exists()]
+    if train and todo:
         import torch
         logger.info("Device: %s", torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")
-        df = load_features(args.instrument)
+        df = features()
         for b in blocks:
             path = out_dir / f"block_{b.block_id:02d}.parquet"
             if path.exists():
@@ -172,7 +196,7 @@ def main() -> None:
             logger.info("block %d/%d: training on %d bars (%s -> %s), testing %s -> %s",
                         b.block_id + 1, len(blocks), len(b.train_idx), b.train_idx[0].date(),
                         b.train_idx[-1].date(), b.splits[0].test_start.date(), b.splits[-1].test_end.date())
-            sig, meta = train_and_predict(df, b.train_idx, b.test_idx, args.instrument, epochs)
+            sig, meta = train_and_predict(df, b.train_idx, b.test_idx, instrument, epochs)
             meta.update({"block_id": b.block_id, "minutes": round((time.time() - t0) / 60, 1)})
             tmp = path.with_suffix(".tmp")
             sig.to_parquet(tmp)
@@ -180,17 +204,22 @@ def main() -> None:
             (out_dir / f"block_{b.block_id:02d}.json").write_text(json.dumps(meta, indent=2))
             logger.info("block %d done in %.1f min (%d signals)", b.block_id, meta["minutes"], len(sig))
 
-    files = sorted(out_dir.glob("block_*.parquet"))
-    if len(files) < len(blocks):
+    files = [out_dir / f"block_{b.block_id:02d}.parquet" for b in blocks]
+    missing = [f for f in files if not f.exists()]
+    if missing:
         logger.warning("Only %d of %d blocks saved; scoring requires all. Re-run to resume.",
-                       len(files), len(blocks))
-        return
+                       len(files) - len(missing), len(files))
+        return None
     signals = pd.concat(pd.read_parquet(f) for f in files).sort_index()
     pos = positions(signals, close.index)
-    pooled, _ = score_strategies(args.instrument, strategies=None,
-                                 max_splits=blocks[-1].splits[-1].split_id + 1 if args.smoke else None,
-                                 refit_months=args.refit_months, train_months=train_months,
-                                 external=pos, out_dir=out_dir / "scores")
+    pooled, _ = score_strategies(instrument, strategies=None,
+                                 max_splits=blocks[-1].splits[-1].split_id + 1 if len(blocks) < full else None,
+                                 refit_months=refit_months, train_months=train_months,
+                                 external=pos, out_dir=out_dir / "scores", close=close)
+    return pooled
+
+
+def print_summary(pooled: pd.DataFrame) -> None:
     view = pooled[pooled["cost"] == "spread"].set_index("strategy")
     gross = pooled[pooled["cost"] == "gross"].set_index("strategy")
     print(f"\n{'strategy':<17}{'trades':>9}{'hit':>8}{'gross Sh':>10}{'net Sh':>9}{'net pips':>11}")
