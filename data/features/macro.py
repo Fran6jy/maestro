@@ -81,7 +81,7 @@ def fetch_fred(start: str = "2003-01-01", api_key: str | None = None) -> pd.Data
     Monthly series come from ALFRED as first releases, so revisions made after
     the fact never reach the features.
     """
-    api_key = api_key or os.environ["FRED_API_KEY"]
+    api_key = (api_key or os.environ["FRED_API_KEY"]).strip().strip("\"'")
     frames = []
     for sid in ALL_SERIES:
         if sid in MONTHLY_SERIES:

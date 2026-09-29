@@ -56,6 +56,11 @@ PIP = 1e-4
 OANDA_URL = os.environ.get("OANDA_BASE_URL", "https://api-fxpractice.oanda.com")
 
 
+def secret(name: str) -> str:
+    """An API key from the environment, without stray whitespace or quotes from pasting."""
+    return os.environ[name].strip().strip("\"'")
+
+
 def _atomic_parquet(df: pd.DataFrame, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -151,7 +156,7 @@ def _oanda(session: requests.Session, instrument: str, params: dict) -> dict:
 def update_candles(instrument: str, start: str = "2005-01-01") -> dict:
     """Append every complete candle after the last one stored (or after `start`)."""
     session = requests.Session()
-    session.headers["Authorization"] = f"Bearer {os.environ['OANDA_API_KEY']}"
+    session.headers["Authorization"] = f"Bearer {secret('OANDA_API_KEY')}"
     last = last_candle(instrument)
     cursor = last if last is not None else pd.Timestamp(start, tz="UTC") - pd.Timedelta(seconds=1)
     added, days = 0, 0
