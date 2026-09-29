@@ -8,8 +8,8 @@ nearly used. Finished blocks land in /kaggle/working/out and become the run's
 output; collect them with cloud/kaggle/collect.py and the laptop scores the
 full design with the same evaluator as every other run.
 
-If fran6jy/maestro-blocks is attached, the blocks it holds (trained in earlier
-sessions or on the laptop) are copied in first and skipped.
+Blocks already trained (in earlier sessions or on the laptop) are passed in
+as --skip by launch.py, so each session continues where the last one stopped.
 
 Settings live in the constants below; cloud/kaggle/launch.py fills them in.
 """
@@ -36,20 +36,38 @@ def sh(*cmd, **kw):
     subprocess.run(cmd, check=True, **kw)
 
 
-sh("git", "clone", "-q", "https://github.com/Fran6jy/maestro.git", str(SRC / "maestro"))
-sh("git", "-C", str(SRC / "maestro"), "checkout", "-q", COMMIT)
-sh(sys.executable, "-m", "pip", "install", "-q", "hmmlearn")
+def find_input(marker: str) -> Path | None:
+    """Where Kaggle mounted a dataset: the folder that contains `marker`
+    (the mount path has changed between Kaggle versions, so search for it)."""
+    return next((p.parent for p in sorted(Path("/kaggle/input").rglob(marker)) if p.is_dir()), None)
 
-env = {**os.environ,
-       "PYTHONPATH": str(SRC),
-       "MAESTRO_RAW_DIR": "/kaggle/input/maestro-raw",
-       "MAESTRO_DATA_DIR": str(WORK / "data"),
-       "MAESTRO_OUTPUT_DIR": str(WORK / "out")}
-sh(sys.executable, "-m", "maestro.data.pipeline.store", "sync", env=env)
 
-done = Path("/kaggle/input/maestro-blocks")
-if done.exists():
-    shutil.copytree(done, WORK / "out" / "maestro", dirs_exist_ok=True)
+def cleanup() -> None:
+    """Keep the output small: only blocks and logs are needed back on the laptop."""
+    shutil.rmtree(SRC, ignore_errors=True)
+    shutil.rmtree(WORK / "data", ignore_errors=True)
+
+
+raw = find_input("candles")
+print("raw data store:", raw, flush=True)
+if raw is None:
+    sh("find", "/kaggle/input", "-maxdepth", "4")
+    raise SystemExit("maestro-raw is not attached to this script")
+
+try:
+    sh("git", "clone", "-q", "https://github.com/Fran6jy/maestro.git", str(SRC / "maestro"))
+    sh("git", "-C", str(SRC / "maestro"), "checkout", "-q", COMMIT)
+    sh(sys.executable, "-m", "pip", "install", "-q", "hmmlearn")
+
+    env = {**os.environ,
+           "PYTHONPATH": str(SRC),
+           "MAESTRO_RAW_DIR": str(raw),
+           "MAESTRO_DATA_DIR": str(WORK / "data"),
+           "MAESTRO_OUTPUT_DIR": str(WORK / "out")}
+    sh(sys.executable, "-m", "maestro.data.pipeline.store", "sync", env=env)
+except Exception:
+    cleanup()
+    raise
 
 import torch  # noqa: E402
 
@@ -67,9 +85,7 @@ for i in range(n):
 codes = [w.wait() for w in workers]
 print("worker exit codes:", codes, flush=True)
 
-# Keep the output small: only blocks and logs are needed back on the laptop.
-shutil.rmtree(SRC, ignore_errors=True)
-shutil.rmtree(WORK / "data", ignore_errors=True)
+cleanup()
 for d in (WORK / "out" / "maestro").glob("*"):
     print(d.name, len(list(d.glob("block_*.parquet"))), "blocks", flush=True)
 if any(codes):
