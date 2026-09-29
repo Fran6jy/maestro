@@ -288,6 +288,8 @@ class PatchTSTSignalModel:
             self.model.load_state_dict(best_state)
 
         self.fitted = True
+        self.best_loss = float(best_loss)
+        self.epochs_run = epoch + 1
         logger.info("PatchTST training complete. Best loss: %.4f", best_loss)
         return self
 

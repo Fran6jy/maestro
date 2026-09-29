@@ -295,6 +295,8 @@ class TransformerRegimeClassifier:
             self.model.load_state_dict(best_state)
 
         self.fitted = True
+        self.best_loss = float(best_val_loss)
+        self.epochs_run = epoch + 1
         logger.info("Transformer training complete. Best val loss: %.4f", best_val_loss)
         return self
 
