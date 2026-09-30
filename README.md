@@ -19,32 +19,54 @@ They came from two unrelated experiments: a linear regression scored on the same
 on, and a separate daily moving-average strategy. Re-running the regression on the same month gives
 46.6%; the original figure mostly reflects how flat price bars were scored.
 
-**Rebuilt under one evaluator, nothing beats buy and hold after costs, MAESTRO included.**
-EUR/USD 5-minute bars, 39 walk-forward test months (Jan 2023 to Mar 2026), every model retrained
+**Rebuilt under one evaluator over 20 years, no strategy survives trading costs, MAESTRO included.**
+EUR/USD 5-minute bars, 243 walk-forward test months (Jan 2006 to Feb 2026), every model retrained
 each quarter on the latest 12 months, 0.8 pips per round trip, £10,000 start:
 
-| Strategy | Right about next move | Trades | Sharpe before costs | Sharpe after costs | £10,000 becomes |
-|---|---:|---:|---:|---:|---:|
-| Buy and hold (benchmark) | 50.4% | 39 | 0.27 | **0.26** | **£10,667** |
-| MAESTRO as designed | n/a | 0 | 0.00 | 0.00 | £10,000 |
-| Moving-average crossover 20/200 | 49.7% | 2,089 | −0.04 | −0.67 | £8,517 |
-| Bollinger bands 20 / 2σ | 51.2% | 7,990 | 1.95 | −1.28 | £7,963 |
-| MAESTRO, most confident 10% | 50.0% | 3,539 | −0.46 | −3.13 | £7,405 |
-| MAESTRO, every signal | 49.7% | 4,949 | −0.82 | −3.67 | £6,298 |
-| Logistic regression, 5 moves | 50.9% | 50,915 | 1.92 | −11.94 | £399 |
-| Contrarian, 3 bars | 50.9% | 63,239 | 2.36 | −15.35 | £182 |
-| Linear regression, 5 moves | 50.8% | 106,835 | 2.12 | −21.71 | £6.86 |
-| Linear regression, 1 move | 50.7% | 116,552 | 0.64 | −24.09 | £2.49 |
-| Coin flip (sanity check) | 49.9% | 115,013 | −0.01 | −24.33 | £2.33 |
+| Strategy | Right about next move | Trades | Pips per trade before costs | Sharpe before costs | Sharpe after costs | £10,000 becomes |
+|---|---:|---:|---:|---:|---:|---:|
+| MAESTRO as designed | n/a | 0 | n/a | 0.00 | 0.00 | £10,000 |
+| Buy and hold (benchmark) | 50.2% | 243 | −0.40 | −0.01 | −0.02 | £9,637 |
+| Bollinger bands 20 / 2σ | 52.6% | 51,966 | +0.70 | 2.07 | −0.30 | £6,474 |
+| Moving-average crossover 20/200 | 49.4% | 13,302 | +0.07 | 0.01 | −0.43 | £4,254 |
+| MAESTRO, most confident 10% | **53.0%** | 40,563 | +0.20 | 0.84 | −2.60 | £1,351 |
+| MAESTRO, every signal | 52.7% | 66,933 | +0.27 | 1.27 | −2.66 | £530 |
+| Contrarian, 3 bars | 52.0% | 415,067 | +0.20 | 3.49 | −10.40 | < £0.01 |
+| Logistic regression, 5 moves | 52.3% | 450,504 | +0.21 | 3.84 | −10.96 | < £0.01 |
+| Linear regression, 5 moves | 51.9% | 662,098 | +0.14 | 3.69 | −15.48 | < £0.01 |
+| Linear regression, 1 move | 51.9% | 757,250 | +0.12 | 3.51 | −18.48 | < £0.01 |
+| Coin flip (sanity check) | 50.0% | 735,364 | +0.00 | 0.11 | −19.25 | < £0.01 |
 
-Short-horizon EUR/USD has a real, small tendency to reverse: the simple models show a positive
-Sharpe before costs. That edge per trade is far smaller than the spread, so only buy and hold ends
-positive.
+**MAESTRO learned a real edge, and it faded.** Over 20 years it calls the next move right more often
+than any other strategy, and it earns 0.2–0.3 pips per trade before costs, on a par with the simple
+models. By era, the edge before costs (most confident 10% / every signal) was:
 
-**MAESTRO has no edge even before costs.** Its forecasts are right 49.7–50.0% of the time and its
-Sharpe before costs is negative. It loses less than the busy MSc models only because it trades far
-less. As designed, its confidence never cleared the thresholds it was built with, so it never traded.
-The three ways of turning its forecasts into trades were fixed before any result was seen.
+| | 2006–10 | 2011–15 | 2016–20 | 2021–26 |
+|---|---:|---:|---:|---:|
+| MAESTRO, pips per trade before costs | +0.19 / +0.26 | +0.36 / +0.46 | +0.19 / +0.23 | about 0 |
+| Logistic regression | +0.16 | +0.29 | +0.23 | +0.14 |
+| Bollinger bands | +0.76 | +0.77 | +0.74 | +0.54 |
+
+The simple models kept part of their edge after 2020; MAESTRO lost all of it. An earlier test over
+2023–2026 alone found MAESTRO with no edge at all, which this explains.
+
+**No edge is large enough to pay for trading.** The best, Bollinger bands, earns 0.70 pips per trade
+before costs against the 0.8 pips assumed here. OANDA's real EUR/USD spread, measured on every bar,
+has a median of 0.9–1.6 pips depending on the year (1.5–1.6 since 2022), so real costs are higher
+still. Buy and hold earns nothing over the full 20 years; its good showing in 2023–2026 was that period.
+
+**The test could have found an edge.** In a power test a known momentum edge was planted in real prices
+and every feature rebuilt. At a 55% edge MAESTRO found it (57.7% hit, Sharpe 6.0 after costs); at a
+52% edge logistic regression found it but MAESTRO largely did not. MAESTRO is therefore less sensitive
+than simple models to small edges, the kind a real market might hold.
+
+**How the evaluation was checked.**
+- Macro inputs (VIX, yields, rates, CPI) reach a bar only once they were public. An earlier version
+  stamped them at midnight on the day they describe, and CPI six weeks before release.
+- Data from 7 March 2026 is sealed and has influenced no decision. It is opened once, for a final
+  confirmation run of a frozen design.
+- Every MAESTRO block's dates were checked across the two machines that trained them.
+- The three ways of turning MAESTRO's forecasts into trades were fixed before any result was seen.
 
 ## Status
 
@@ -52,9 +74,12 @@ The three ways of turning its forecasts into trades were fixed before any result
 |---|---|
 | Re-examine the MSc figures | Done |
 | Leakage-free, cost-aware evaluator with look-ahead tests | Done |
-| MSc strategies rebuilt and scored | Done |
-| MAESTRO scored on the same evaluator | Done: no edge before or after costs |
-| Side-by-side live trial on an OANDA **practice** account | Next |
+| 20 years of data, macro timing fixed, holdout sealed | Done |
+| MSc strategies and MAESTRO scored over 20 years | Done: real but fading edge, nothing beats costs |
+| Power test: can the pipeline find a planted edge? | Done |
+| Monthly vs quarterly retraining | Running |
+| Horizon sweep (1-hour, 4-hour, daily bars) and the risk agent | Next |
+| Side-by-side live trial on an OANDA **practice** account | After that |
 | Cross-asset extension (gold, S&P 500) | Later |
 
 ## How MAESTRO works
@@ -82,6 +107,7 @@ trader/          paper-trading engine, portfolio allocator, read-only OANDA clie
 shared/          contracts shared between research and trading code
 tests/           unit tests, including no-look-ahead checks for the evaluator
 demo/            data export for the website
+cloud/           runs retraining blocks on Kaggle's free GPUs
 web/             the public website (Next.js, deployed on Vercel)
 docs/            thesis narrative and design documents
 ```
@@ -96,17 +122,23 @@ maestro/venv/Scripts/pip install -r maestro/requirements.txt
 ```
 
 Training MAESTRO needs CUDA PyTorch (`pip install torch==2.10.0 --index-url
-https://download.pytorch.org/whl/cu128`, plus `hmmlearn statsmodels`). The full run takes about four
-hours on a laptop RTX 3070 Ti and saves each quarterly block as it finishes, so it can resume.
+https://download.pytorch.org/whl/cu128`, plus `hmmlearn statsmodels`).
 
-Price data (OANDA EUR/USD 5-minute features) is not in the repository. Point
-`MAESTRO_DATA_DIR` at a folder containing `EUR_USD_features.parquet` (a `.env` file works).
+Price data is not in the repository: OANDA's prices may not be redistributed. Build your own copy
+with an OANDA account (a free practice account works) and a free FRED API key, set as
+`OANDA_API_KEY` and `FRED_API_KEY` (a `.env` file works):
 
 ```bash
-python -m maestro.backtesting.maestro_runner --refit-months 3 --train-months 12   # train MAESTRO, score everything
-python -m pytest maestro/tests/test_baselines.py   # the no-look-ahead tests
-python -m maestro.demo.export_web_data             # rebuild the website's data
+python -m maestro.data.pipeline.store fetch --start 2005-01-01   # candles + FRED into $MAESTRO_DATA_DIR/raw
+python -m maestro.data.pipeline.store sync                       # rebuild the feature table
+python -m maestro.backtesting.maestro_runner --refit-months 3 --train-months 12 --fast
+python -m pytest maestro/tests --ignore=maestro/tests/smoke_test.py   # look-ahead, timing, store, runner
+python -m maestro.demo.export_web_data                           # rebuild the website's data
 ```
+
+The 20-year run is 81 retraining blocks of 10–15 minutes each on a laptop RTX 3070 Ti. Every block
+is saved as it finishes, so a run can stop and resume, and blocks can be split across machines
+(`--shard`, `--reverse`). `cloud/kaggle/` runs the same blocks on Kaggle's free GPUs.
 
 The methodology is documented in full on the site's
 [method page](https://maestro-research.vercel.app/method) and in
