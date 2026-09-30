@@ -38,9 +38,9 @@ def kaggle(*args: str) -> str:
     return subprocess.run(cmd, check=True, capture_output=True, text=True).stdout
 
 
-def pushed_commit() -> str:
-    """HEAD, provided GitHub already has it (the Kaggle job clones the public repo)."""
-    head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"],
+def pushed_commit(ref: str = "HEAD") -> str:
+    """The commit `ref` names, provided GitHub already has it (the Kaggle job clones the public repo)."""
+    head = subprocess.run(["git", "-C", str(REPO), "rev-parse", ref],
                           check=True, capture_output=True, text=True).stdout.strip()
     remote = subprocess.run(["git", "-C", str(REPO), "branch", "-r", "--contains", head],
                             capture_output=True, text=True).stdout
@@ -60,6 +60,7 @@ def main() -> None:
     p.add_argument("--budget-hours", type=float, default=6.0,
                    help="Kaggle stops sessions at 12 h; shorter sessions lose less if one is killed")
     p.add_argument("--smoke", action="store_true", help="first block only, one epoch")
+    p.add_argument("--commit", default="HEAD", help="code version to run (must be on GitHub)")
     p.add_argument("--reverse", action="store_true",
                    help="train the latest blocks first (while the laptop works forward on the same design)")
     args = p.parse_args()
@@ -77,7 +78,7 @@ def main() -> None:
     stage = OUTPUT_DIR / "kaggle_push"
     stage.mkdir(parents=True, exist_ok=True)
     code = (HERE / "run.py").read_text(encoding="utf-8")
-    code = (code.replace("__COMMIT__", pushed_commit())
+    code = (code.replace("__COMMIT__", pushed_commit(args.commit))
                 .replace("__RUNNER_ARGS__", runner_args)
                 .replace("__BUDGET_HOURS__", str(args.budget_hours)))
     (stage / "run.py").write_text(code, encoding="utf-8")
