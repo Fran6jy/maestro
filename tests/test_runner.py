@@ -60,3 +60,12 @@ def test_skipped_blocks_are_not_trained(tmp_path, monkeypatch):
     runner.run_design(close, tmp_path, "EUR_USD", lambda: None, skip={0, 1})
     assert len(calls) == len(blocks) - 2
     assert blocks[0].test_idx[0] not in calls and blocks[1].test_idx[0] not in calls
+
+
+def test_limit_trains_at_most_n_blocks_per_call(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(runner, "train_and_predict", _stub(calls))
+    close = _close()
+    runner.run_design(close, tmp_path, "EUR_USD", lambda: None, limit=1)
+    runner.run_design(close, tmp_path, "EUR_USD", lambda: None, limit=1)
+    assert len(calls) == 2 == len(set(calls))              # a second call picks up the next block

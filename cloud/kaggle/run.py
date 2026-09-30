@@ -3,8 +3,11 @@ MAESTRO retraining blocks on Kaggle's free GPUs (T4 x2).
 
 Runs as a private Kaggle script. It clones the public code at a pinned commit,
 rebuilds the features from the private dataset fran6jy/maestro-raw, then runs
-one maestro_runner worker per GPU (--shard i/n) until the session budget is
-nearly used. Finished blocks land in /kaggle/working/out and become the run's
+as many maestro_runner workers as fit in memory (at most one per GPU, --shard
+i/n). Each worker trains one block per fresh process, so memory is returned
+after every block, until the session budget is nearly used. A heartbeat with
+free RAM and progress goes to the main log, which Kaggle keeps even if it kills
+the session. Finished blocks land in /kaggle/working/out and become the run's
 output; collect them with cloud/kaggle/collect.py and the laptop scores the
 full design with the same evaluator as every other run.
 
@@ -17,6 +20,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -71,22 +75,71 @@ except Exception:
 
 import torch  # noqa: E402
 
-n = max(1, torch.cuda.device_count())
-hours_left = BUDGET_HOURS - (time.time() - t0) / 3600
-print(f"{n} GPU(s): {[torch.cuda.get_device_name(i) for i in range(n)]}; {hours_left:.1f} h for training",
-      flush=True)
-workers = []
-for i in range(n):
-    log = open(LOGS / f"worker_{i}.log", "w")
-    cmd = [sys.executable, "-u", "-m", "maestro.backtesting.maestro_runner", *RUNNER_ARGS.split(),
-           "--shard", f"{i}/{n}", "--max-hours", f"{hours_left:.2f}"]
-    workers.append(subprocess.Popen(cmd, env={**env, "CUDA_VISIBLE_DEVICES": str(i)},
-                                    stdout=log, stderr=subprocess.STDOUT))
-codes = [w.wait() for w in workers]
+GB_PER_WORKER = 6.5     # peak RAM of one worker on a full block (measured 5.7 GB) plus margin
+RETRIES = 2             # a worker survives this many failed blocks (e.g. a transient CUDA error)
+OUT = WORK / "out" / "maestro"
+
+
+def meminfo_gb(key: str) -> float:
+    for line in open("/proc/meminfo"):
+        if line.startswith(key + ":"):
+            return int(line.split()[1]) / 1024 ** 2
+    return float("nan")
+
+
+def done_by(i: int, n: int) -> int:
+    """Blocks of worker i's shard already saved in this session."""
+    return sum(int(f.stem.split("_")[1]) % n == i for f in OUT.glob("*/block_*.parquet"))
+
+
+gpus = torch.cuda.device_count()
+total, free = meminfo_gb("MemTotal"), meminfo_gb("MemAvailable")
+# One worker per GPU, but only as many as fit in memory at the same time.
+n = max(1, min(max(gpus, 1), int((free - 2) // GB_PER_WORKER)))
+deadline = t0 + BUDGET_HOURS * 3600
+print(f"RAM {total:.1f} GB total, {free:.1f} GB free | GPUs: "
+      f"{[torch.cuda.get_device_name(i) for i in range(gpus)]} | {n} worker(s), "
+      f"{(deadline - time.time()) / 3600:.1f} h left", flush=True)
+
+codes: dict[int, int] = {}
+
+
+def worker(i: int) -> None:
+    """Train one block per fresh process, so memory is returned after every block."""
+    failures = 0
+    with open(LOGS / f"worker_{i}.log", "a") as log:
+        while True:
+            before = done_by(i, n)
+            cmd = [sys.executable, "-u", "-m", "maestro.backtesting.maestro_runner", *RUNNER_ARGS.split(),
+                   "--shard", f"{i}/{n}", "--limit", "1",
+                   "--max-hours", f"{(deadline - time.time()) / 3600:.2f}"]
+            rc = subprocess.run(cmd, env={**env, "CUDA_VISIBLE_DEVICES": str(i)},
+                                stdout=log, stderr=subprocess.STDOUT).returncode
+            if rc != 0:
+                failures += 1
+                print(f"worker {i}: block process exited {rc} ({failures}/{RETRIES + 1})", flush=True)
+                if failures > RETRIES:
+                    codes[i] = rc
+                    return
+                continue
+            if done_by(i, n) == before:      # nothing left for this worker, or no time for another block
+                codes[i] = 0
+                return
+
+
+threads = [threading.Thread(target=worker, args=(i,), daemon=True) for i in range(n)]
+for th in threads:
+    th.start()
+while any(th.is_alive() for th in threads):
+    # Heartbeat in the main log, which Kaggle keeps even if the session is killed.
+    for th in threads:
+        th.join(timeout=300 / len(threads))
+    print(f"[{(time.time() - t0) / 3600:.1f} h] RAM free {meminfo_gb('MemAvailable'):.1f} GB | "
+          f"blocks done: {[done_by(i, n) for i in range(n)]}", flush=True)
 print("worker exit codes:", codes, flush=True)
 
 cleanup()
-for d in (WORK / "out" / "maestro").glob("*"):
+for d in OUT.glob("*"):
     print(d.name, len(list(d.glob("block_*.parquet"))), "blocks", flush=True)
-if any(codes):
+if any(codes.values()):
     sys.exit(1)

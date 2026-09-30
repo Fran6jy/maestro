@@ -164,6 +164,8 @@ def main() -> None:
     p.add_argument("--reverse", action="store_true", help="train the latest blocks first")
     p.add_argument("--skip", default="", metavar="IDS",
                    help="block ids already trained elsewhere, e.g. 0-40,52 (a cloud session resuming)")
+    p.add_argument("--limit", type=int, default=None,
+                   help="train at most this many new blocks, then exit (one process per block)")
     p.add_argument("--max-hours", type=float, default=None,
                    help="stop starting new blocks when a block might not finish in this many hours")
     args = p.parse_args()
@@ -180,7 +182,7 @@ def main() -> None:
                         lambda: load_features(args.instrument), args.refit_months, train_months,
                         epochs, max_blocks=1 if args.smoke else None, train=not args.score_only,
                         fast=args.fast, shard=tuple(map(int, args.shard.split("/"))) if args.shard else None,
-                        reverse=args.reverse, skip=parse_ids(args.skip),
+                        reverse=args.reverse, skip=parse_ids(args.skip), limit=args.limit,
                         deadline=time.time() + args.max_hours * 3600 if args.max_hours else None)
     if pooled is not None:
         print_summary(pooled)
@@ -212,13 +214,14 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
                train_months: int | None = 12, epochs: int = EPOCHS, max_blocks: int | None = None,
                train: bool = True, fast: bool = False, shard: tuple[int, int] | None = None,
                reverse: bool = False, deadline: float | None = None,
-               skip: set[int] | None = None) -> pd.DataFrame | None:
+               skip: set[int] | None = None, limit: int | None = None) -> pd.DataFrame | None:
     """Train MAESTRO block by block (resumable), then score it with every baseline.
 
     features : callable returning the feature table, only called if a block needs training.
     shard    : (i, n) trains only blocks with block_id % n == i, so several GPUs or machines
                can share one design; blocks are independent, so the results are identical.
     skip     : block ids trained elsewhere; not trained here (their files are merged later)
+    limit    : train at most this many new blocks in this call
     deadline : epoch seconds after which no new block is started if it might not finish
                (a cloud session's time limit); finished blocks are kept either way.
     Returns the pooled scores, or None if some blocks are still missing.
@@ -240,10 +243,13 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
         mine = [b for b in blocks if (shard is None or b.block_id % shard[1] == shard[0])
                 and b.block_id not in (skip or set())]
         longest = 20 * 60.0                                  # assume 20 min until one has been timed
+        trained = 0
         for b in (reversed(mine) if reverse else mine):
             path = out_dir / f"block_{b.block_id:02d}.parquet"
             if path.exists():
                 continue
+            if limit is not None and trained >= limit:
+                break
             if deadline and time.time() + 1.3 * longest > deadline:
                 logger.info("Stopping before block %d: it might not finish before the deadline", b.block_id)
                 break
@@ -258,6 +264,7 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
             tmp.replace(path)                                  # atomic: never a half-written block
             (out_dir / f"block_{b.block_id:02d}.json").write_text(json.dumps(meta, indent=2))
             longest = max(longest, time.time() - t0)
+            trained += 1
             logger.info("block %d done in %.1f min (%d signals)", b.block_id, meta["minutes"], len(sig))
 
     files = [out_dir / f"block_{b.block_id:02d}.parquet" for b in blocks]

@@ -57,8 +57,11 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Start a MAESTRO training session on Kaggle")
     p.add_argument("--refit-months", type=int, default=1)
     p.add_argument("--train-months", type=int, default=12)
-    p.add_argument("--budget-hours", type=float, default=11.0, help="Kaggle stops sessions at 12 h")
+    p.add_argument("--budget-hours", type=float, default=6.0,
+                   help="Kaggle stops sessions at 12 h; shorter sessions lose less if one is killed")
     p.add_argument("--smoke", action="store_true", help="first block only, one epoch")
+    p.add_argument("--reverse", action="store_true",
+                   help="train the latest blocks first (while the laptop works forward on the same design)")
     args = p.parse_args()
 
     tag = tag_for(args.refit_months, args.train_months, args.smoke)
@@ -66,6 +69,8 @@ def main() -> None:
     runner_args = f"--refit-months {args.refit_months} --train-months {args.train_months} --fast"
     if args.smoke:
         runner_args += " --smoke --epochs 1"
+    if args.reverse:
+        runner_args += " --reverse"
     if done:
         runner_args += f" --skip {format_ids(done)}"
 
