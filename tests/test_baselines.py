@@ -134,3 +134,22 @@ def test_maestro_top10_cutoff_uses_only_earlier_bars():
     assert base[:bars[1500]].iloc[:-1].equals(positions(later, bars)["maestro_top10"][:bars[1500]].iloc[:-1])
     assert (base[bars[:288]] == 0).all()                        # no cut-off until a day of history
     assert 0.05 < (base[bars[300]:] != 0).mean() < 0.15         # trades roughly its top 10%
+
+
+def test_scaled_positions_pay_costs_on_what_they_trade():
+    close = _random_walk(n=500)
+    unit = pd.Series(np.tile([1.0, 1.0, -1.0, -1.0, 0.0], 100), index=close.index)
+    full = summarise([simulate(unit, close, PIP)], cost_pips=1.0, pip=PIP)
+    half = summarise([simulate(unit * 0.5, close, PIP)], cost_pips=1.0, pip=PIP)
+    assert half["net_pips_total"] == pytest.approx(full["net_pips_total"] / 2)
+    assert half["n_trades"] == full["n_trades"]
+
+
+def test_resizing_a_position_is_not_a_new_trade():
+    close = _random_walk(n=10)
+    pos = pd.Series([1.0, 1.0, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0], index=close.index)
+    res = simulate(pos, close, PIP)
+    assert len(res.trades) == 1
+    gross = summarise([res], cost_pips=0.0, pip=PIP)["net_pips_total"]
+    net = summarise([res], cost_pips=1.0, pip=PIP)["net_pips_total"]
+    assert gross - net == pytest.approx(res.bars["turnover"].sum() / 2)   # 1 + 0.5 + 0.5 + 1 = 3 units

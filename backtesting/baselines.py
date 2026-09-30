@@ -194,12 +194,16 @@ def simulate(positions: pd.Series, close: pd.Series, pip: float) -> WindowResult
         "turnover": (pos - pos.shift(1).fillna(0.0)).abs(),
         "close":    close,
     })
-    run_id = (held != held.shift(1)).cumsum()
+    # A trade is a run in one direction; its size may change along the way (a risk layer
+    # scaling a position), which moves turnover and therefore cost, not the trade count.
+    direction = np.sign(held)
+    run_id = (direction != direction.shift(1)).cumsum()
     in_mkt = held != 0
     trades = (bars[in_mkt]
+              .assign(size=held.abs())
               .groupby(run_id[in_mkt])
-              .agg(direction=("held", "first"), gross_pips=("pnl_pips", "sum"),
-                   n_bars=("held", "size"))
+              .agg(direction=("held", lambda h: float(np.sign(h.iloc[0]))),
+                   gross_pips=("pnl_pips", "sum"), n_bars=("held", "size"), size=("size", "mean"))
               .reset_index(drop=True))
     return WindowResult(bars, trades)
 
@@ -228,8 +232,10 @@ def summarise(results: list[WindowResult], cost_pips: float, pip: float) -> dict
     hit_dir = float((np.sign(bars["held"]) == np.sign(bars["r_log"]))[both].mean()) if both.any() else np.nan
     hit_msc = float(((bars["held"] * bars["r_log"]) > 0)[in_mkt].mean()) if in_mkt.any() else np.nan
 
-    net_trade_pips = trades["gross_pips"] - cost_pips
-    net_pips_total = float(net_trade_pips.sum())
+    # Costs follow turnover: half a round trip per unit of position change. For unit positions
+    # this is exactly one round trip per trade; for scaled positions it charges what was traded.
+    net_pips_total = float(trades["gross_pips"].sum() - bars["turnover"].sum() * cost_pips / 2.0)
+    net_trade_pips = trades["gross_pips"] - cost_pips * trades["size"]
 
     net_log = _net_log(bars, cost_pips, pip)
     daily = net_log.groupby(net_log.index.normalize()).sum()
