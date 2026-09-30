@@ -65,6 +65,18 @@ def train_and_predict(df: pd.DataFrame, train_idx: pd.Index, test_idx: pd.Index,
                       instrument: str, epochs: int, fast: bool = False,
                       granularity: str = "M5") -> tuple[pd.DataFrame, dict]:
     """Fit regime + signal agents on train_idx, forecast every bar of test_idx."""
+    regime, signal, meta = train_agents(df, train_idx, instrument, epochs, fast, granularity)
+    out = predict_bars(regime, signal, df, test_idx)
+    meta["signal_bars"] = len(out)
+    return out, meta
+
+
+def train_agents(df: pd.DataFrame, train_idx: pd.Index, instrument: str, epochs: int,
+                 fast: bool = False, granularity: str = "M5") -> tuple:
+    """Fit the regime and signal agents on train_idx (the last VAL_MONTHS for early stopping).
+
+    Returns (regime agent, signal agent, metadata). The live trial saves these two agents.
+    """
     from maestro.agents.regime.regime_classifier import RegimeDetectionAgent
     from maestro.agents.regime.transformer_regime import TransformerConfig
     from maestro.agents.signal.patchtst import PatchTSTConfig
@@ -103,17 +115,20 @@ def train_and_predict(df: pd.DataFrame, train_idx: pd.Index, test_idx: pd.Index,
     meta.update({"fast": fast, "signal_fit_minutes": round((time.time() - t0) / 60, 2),
                  "tft_best_val_loss": getattr(signal.tft, "best_loss", None),
                  "tft_epochs": getattr(signal.tft, "epochs_run", None)})
+    return regime, signal, meta
 
-    # Forecast the test block with a run-up of earlier (already known) bars for context.
+
+SIGNAL_COLUMNS = ["signal", "confidence", "regime", "model_agree", "tft_signal", "ptst_signal", "pred_p50"]
+
+
+def predict_bars(regime, signal, df: pd.DataFrame, test_idx: pd.Index) -> pd.DataFrame:
+    """Forecast every bar of test_idx, with a run-up of earlier (already known) bars for context."""
     start = df.index.get_indexer([test_idx[0]])[0]
     infer = df.iloc[max(0, start - WARMUP_BARS): df.index.get_indexer([test_idx[-1]])[0] + 1].dropna()
     regimes = regime.predict_batch(infer)["regime"]
     out = signal.predict_batch(infer, regimes)
-    cols = ["signal", "confidence", "regime", "model_agree", "tft_signal", "ptst_signal", "pred_p50"]
-    out = out[[c for c in cols if c in out.columns]]
-    out = out[out.index.isin(test_idx)]
-    meta["signal_bars"] = len(out)
-    return out, meta
+    out = out[[c for c in SIGNAL_COLUMNS if c in out.columns]]
+    return out[out.index.isin(test_idx)]
 
 
 TOP_SHARE = 0.10        # maestro_top10: share of calls confident enough to trade
