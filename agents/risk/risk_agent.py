@@ -329,7 +329,10 @@ class RiskManagementAgent:
         # ── Layer D: Cost filter ──────────────────────────────────────────────
         cost_est  = self.cost_model.estimate(units, current_price,
                                               session=self._current_session(ts))
-        edge_pips = signal_packet.pred_p50 * current_price / self.pip_size if signal_packet.pred_p50 else 0.0
+        # Expected move in the direction of the trade: a short needs a negative forecast.
+        # (Using the signed forecast alone rejected every short.)
+        edge_pips = (signal * signal_packet.pred_p50 * current_price / self.pip_size
+                     if signal_packet.pred_p50 else 0.0)
         if edge_pips < HARD_LIMITS["min_edge_pips"] + cost_est.breakeven_pips:
             return self._flat_decision(ts,
                 f"insufficient_edge: {edge_pips:.2f}p < {cost_est.breakeven_pips:.2f}p breakeven")
