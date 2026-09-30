@@ -1,0 +1,30 @@
+# MAESTRO live trial on the Oracle VM. Opens no ports; everything lives in ./state.
+#   ./state/models/current   trained model (copied from the laptop after live.deploy)
+#   ./state/journal.db       forecasts, decisions, paper ledger, practice orders
+#   ./state/status.json      heartbeat, rewritten after every bar
+#   ./state/live.log         log
+# Secrets come from ./.env, which you create on the VM and never commit:
+#   OANDA_API_KEY=...   OANDA_ACCOUNT_ID=...   FRED_API_KEY=...
+services:
+  maestro-live:
+    build:
+      context: .
+      args:
+        COMMIT: ${MAESTRO_COMMIT:-main}
+    container_name: maestro-live
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      OANDA_ENVIRONMENT: practice
+    volumes:
+      - ./state:/state
+    # Paper-trades every strategy. Add "--orders <strategy>" once the frozen design names
+    # the one MAESTRO variant that also trades on the practice account.
+    command: []
+    mem_limit: 4g
+    cpus: 2.0
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
