@@ -19,54 +19,59 @@ They came from two unrelated experiments: a linear regression scored on the same
 on, and a separate daily moving-average strategy. Re-running the regression on the same month gives
 46.6%; the original figure mostly reflects how flat price bars were scored.
 
-**Rebuilt under one evaluator over 20 years, no strategy survives trading costs, MAESTRO included.**
+**Rebuilt under one evaluator over 20 years, no baseline survives trading costs.**
 EUR/USD 5-minute bars, 243 walk-forward test months (Jan 2006 to Feb 2026), every model retrained
 each quarter on the latest 12 months, 0.8 pips per round trip, £10,000 start:
 
 | Strategy | Right about next move | Trades | Pips per trade before costs | Sharpe before costs | Sharpe after costs | £10,000 becomes |
 |---|---:|---:|---:|---:|---:|---:|
-| MAESTRO as designed | n/a | 0 | n/a | 0.00 | 0.00 | £10,000 |
 | Buy and hold (benchmark) | 50.2% | 243 | −0.40 | −0.01 | −0.02 | £9,637 |
 | Bollinger bands 20 / 2σ | 52.6% | 51,966 | +0.70 | 2.07 | −0.30 | £6,474 |
 | Moving-average crossover 20/200 | 49.4% | 13,302 | +0.07 | 0.01 | −0.43 | £4,254 |
-| MAESTRO, most confident 10% | **53.0%** | 40,563 | +0.20 | 0.84 | −2.60 | £1,351 |
-| MAESTRO, every signal | 52.7% | 66,933 | +0.27 | 1.27 | −2.66 | £530 |
 | Contrarian, 3 bars | 52.0% | 415,067 | +0.20 | 3.49 | −10.40 | < £0.01 |
 | Logistic regression, 5 moves | 52.3% | 450,504 | +0.21 | 3.84 | −10.96 | < £0.01 |
 | Linear regression, 5 moves | 51.9% | 662,098 | +0.14 | 3.69 | −15.48 | < £0.01 |
 | Linear regression, 1 move | 51.9% | 757,250 | +0.12 | 3.51 | −18.48 | < £0.01 |
 | Coin flip (sanity check) | 50.0% | 735,364 | +0.00 | 0.11 | −19.25 | < £0.01 |
 
-**MAESTRO learned a real edge, and it faded.** Over 20 years it calls the next move right more often
-than any other strategy, and it earns 0.2–0.3 pips per trade before costs, on a par with the simple
-models. By era, the edge before costs (most confident 10% / every signal) was:
+Short-horizon EUR/USD has a real, small edge (52–53% of next moves called right, a positive Sharpe
+before costs), but it is worth only 0.1–0.7 pips per trade. OANDA's real EUR/USD spread, measured on
+every bar, has a median of 0.9–1.6 pips depending on the year (1.5–1.6 since 2022). Buy and hold earns
+nothing over the full 20 years; its good showing in 2023–2026 was that period.
 
-| | 2006–10 | 2011–15 | 2016–20 | 2021–26 |
-|---|---:|---:|---:|---:|
-| MAESTRO, pips per trade before costs | +0.19 / +0.26 | +0.36 / +0.46 | +0.19 / +0.23 | about 0 |
-| Logistic regression | +0.16 | +0.29 | +0.23 | +0.14 |
-| Bollinger bands | +0.76 | +0.77 | +0.74 | +0.54 |
+**MAESTRO's results are being re-run.** Two look-ahead bugs were found and fixed on 30 September 2026:
+macro data reached the models before it was published, and MAESTRO's regime detector labelled each
+bar using the whole three-month test block it sat in (the HMM's Viterbi path and forward-backward
+smoothing), so a bar's regime depended on later prices. On real blocks that changed 1–5% of regime
+labels, concentrated at regime switches. Every MAESTRO number produced before the fix, including an
+apparent 53% hit rate that faded after 2020, the power test and the risk-layer tests, is being
+re-run on the fixed code. The baselines use prices only and are unaffected.
 
-The simple models kept part of their edge after 2020; MAESTRO lost all of it. An earlier test over
-2023–2026 alone found MAESTRO with no edge at all, which this explains.
-
-**No edge is large enough to pay for trading.** The best, Bollinger bands, earns 0.70 pips per trade
-before costs against the 0.8 pips assumed here. OANDA's real EUR/USD spread, measured on every bar,
-has a median of 0.9–1.6 pips depending on the year (1.5–1.6 since 2022), so real costs are higher
-still. Buy and hold earns nothing over the full 20 years; its good showing in 2023–2026 was that period.
-
-**The test could have found an edge.** In a power test a known momentum edge was planted in real prices
-and every feature rebuilt. At a 55% edge MAESTRO found it (57.7% hit, Sharpe 6.0 after costs); at a
-52% edge logistic regression found it but MAESTRO largely did not. MAESTRO is therefore less sensitive
-than simple models to small edges, the kind a real market might hold.
-
-**How the evaluation was checked.**
-- Macro inputs (VIX, yields, rates, CPI) reach a bar only once they were public. An earlier version
-  stamped them at midnight on the day they describe, and CPI six weeks before release.
+**How the evaluation is checked.**
+- Macro inputs (VIX, yields, rates, CPI) reach a bar only once they were public.
+- Regimes are forward-filtered: a bar's regime uses only bars up to it. Tests prove that rewriting
+  later prices cannot change an earlier regime, and that the old method could.
 - Data from 7 March 2026 is sealed and has influenced no decision. It is opened once, for a final
   confirmation run of a frozen design.
-- Every MAESTRO block's dates were checked across the two machines that trained them.
-- The three ways of turning MAESTRO's forecasts into trades were fixed before any result was seen.
+- A power test plants a known edge in real prices to check the pipeline can find one.
+- Every retraining block's dates were checked across the machines that trained it, and the ways
+  of turning MAESTRO's forecasts into trades are fixed before any result is seen.
+
+## Live trial
+
+A 4–8 week forward test on an OANDA **practice** account (demo money only) runs MAESTRO and the
+baselines side by side on every 5-minute bar, to measure how far live trading departs from the
+backtest. It runs in one Docker container on a small always-on server (`deploy/live/`).
+
+- Every strategy is paper-traded at OANDA's live bid/ask; one MAESTRO variant also sends real orders
+  to the practice account, so real spreads, fills and delays are measured too.
+- Live decisions are the backtest's decisions: a model trained, saved and reloaded, fed only data up
+  to each bar, gives the backtest's forecast on 40 of 40 test bars, and every strategy's live rule
+  is tested bar for bar against the backtest's.
+- `live/oanda.py` can only reach OANDA's practice server and never resends an order.
+
+Status: paper-only shakedown since 30 September 2026. The trial proper starts once the corrected
+MAESTRO results fix which variant trades and the holdout confirmation has run.
 
 ## Status
 
@@ -74,12 +79,11 @@ than simple models to small edges, the kind a real market might hold.
 |---|---|
 | Re-examine the MSc figures | Done |
 | Leakage-free, cost-aware evaluator with look-ahead tests | Done |
-| 20 years of data, macro timing fixed, holdout sealed | Done |
-| MSc strategies and MAESTRO scored over 20 years | Done: real but fading edge, nothing beats costs |
-| Power test: can the pipeline find a planted edge? | Done |
-| Monthly vs quarterly retraining | Running |
-| Horizon sweep (1-hour, 4-hour, daily bars) and the risk agent | Next |
-| Side-by-side live trial on an OANDA **practice** account | After that |
+| 20 years of data, daily ingestion, macro timing fixed, holdout sealed | Done |
+| MSc strategies scored over 20 years | Done: small real edge, nothing beats costs |
+| MAESTRO over 20 years, power test, risk layer | Re-running after the regime fix |
+| Monthly vs quarterly retraining, horizon sweep (1-hour, 4-hour, daily bars) | After the re-run |
+| Live trial on an OANDA **practice** account | Paper shakedown running |
 | Cross-asset extension (gold, S&P 500) | Later |
 
 ## How MAESTRO works
@@ -108,6 +112,8 @@ shared/          contracts shared between research and trading code
 tests/           unit tests, including no-look-ahead checks for the evaluator
 demo/            data export for the website
 cloud/           runs retraining blocks on Kaggle's free GPUs
+live/            the live trial: forecasts, decisions, paper ledger, practice orders
+deploy/live/     Docker setup for the live trial
 web/             the public website (Next.js, deployed on Vercel)
 docs/            thesis narrative and design documents
 ```
