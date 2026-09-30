@@ -194,8 +194,7 @@ raw Sharpe for non-normality and for the number of configurations tested.
   at zero cost is rejected.
 - Regime-stratified performance: confirm results are not driven by one regime.
 - Sub-period stability: compare early vs late splits for decay.
-- Significance: hit rate tested against 50% with a binomial z-test (already scripted
-  in `verify_edge.py`).
+- Significance: hit rate tested against 50% with a binomial z-test.
 
 ---
 

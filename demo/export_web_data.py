@@ -31,13 +31,53 @@ import numpy as np
 import pandas as pd
 
 from maestro.backtesting.baselines import OUTPUT_DIR, design_tag, load_close
-from maestro.demo.findings.build_page import STRATEGY_TEXT, msc_replication
 
 ROOT = Path(__file__).resolve().parent.parent
 WEB_DATA = ROOT / "web" / "src" / "data"
 SCALE = 1e7          # daily log returns stored as integers (1e-7 precision)
 RIDGE_DAYS = 150     # intraday paths used by the hero visual
 RIDGE_POINTS = 72    # 20-minute resolution per day
+
+# Plain-language labels for the site: (label, group, description).
+STRATEGY_TEXT = {
+    "logreg_lag5":    ("Logistic regression", "msc",
+                       "Looks at the last five 5-minute moves and predicts whether the next one is up or down."),
+    "bollinger_20_2": ("Bollinger bands", "msc",
+                       "Buys when the price is unusually low for the last 100 minutes and sells when it is unusually high."),
+    "contrarian_3":   ("Contrarian", "msc",
+                       "Bets that the last 15 minutes of movement will reverse."),
+    "linreg_lag5":    ("Linear regression, 5 moves", "msc",
+                       "Fits a straight line through the last five moves to predict the next one."),
+    "linreg_lag1":    ("Linear regression, 1 move", "msc",
+                       "Predicts the next move from the last one alone. This is the model behind the MSc's 37.6% figure."),
+    "sma_20_200":     ("Moving-average crossover", "msc",
+                       "Follows the trend when the 20-bar average crosses the 200-bar average."),
+    "random":         ("Coin flip", "ref",
+                       "Picks up or down at random every 5 minutes. It should lose roughly what its trades cost, and it does."),
+    "buy_hold":       ("Buy and hold", "ref",
+                       "Buys EUR/USD at the start of each test month and holds it to the end."),
+}
+
+MSC_REPORTED = {"hit": 37.56, "hit_5lag": 36.875, "sharpe": 0.599}
+MSC_WINDOW = ("2023-06-29", "2023-07-31")
+SAMPLE_BARS = 96   # eight hours of 5-minute bars
+
+
+def msc_replication(close: pd.Series) -> dict:
+    """Re-run the MSc's one-lag linear regression on its own window, scored its way."""
+    w = close.loc[MSC_WINDOW[0]:MSC_WINDOW[1]]
+    rerun, sample = {}, {}
+    for key, series in (("5dp", w), ("4dp", w.round(4))):
+        r = np.log(series / series.shift(1))
+        d = pd.DataFrame({"r": r, "lag": r.shift(1)}).dropna()
+        coef = np.linalg.lstsq(d[["lag"]].values, d["r"].values, rcond=None)[0]
+        pred = np.sign(d[["lag"]].values @ coef).ravel()
+        hits = np.sign(d["r"].values * pred) == 1
+        rerun[key] = {"hit": float(hits.mean()), "flat_share": float((d["r"] == 0).mean())}
+        sample[key] = [int(v) for v in np.sign(r.dropna().iloc[:SAMPLE_BARS].values)]
+    return {"reported_hit": MSC_REPORTED["hit"], "reported_hit_5lag": MSC_REPORTED["hit_5lag"],
+            "reported_sharpe": MSC_REPORTED["sharpe"], "rerun": rerun, "sample": sample}
+
 
 DESIGN = design_tag(refit_months=3, train_months=12)   # the design the site reports
 

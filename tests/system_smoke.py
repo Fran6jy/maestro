@@ -1,5 +1,5 @@
 """
-maestro/tests/smoke_test.py
+maestro/tests/system_smoke.py
 =============================
 MAESTRO End-to-End Smoke Test.
 
@@ -10,16 +10,16 @@ Run this FIRST before pointing MAESTRO at real data.
 
 Usage
 -----
-    python -m maestro.tests.smoke_test           # full suite
-    python -m maestro.tests.smoke_test --fast    # skip RL + XAI
-    python -m maestro.tests.smoke_test --layer data
-    python -m maestro.tests.smoke_test --layer regime
-    python -m maestro.tests.smoke_test --layer signal
-    python -m maestro.tests.smoke_test --layer risk
-    python -m maestro.tests.smoke_test --layer orchestrator
-    python -m maestro.tests.smoke_test --layer compliance
-    python -m maestro.tests.smoke_test --layer monitoring
-    python -m maestro.tests.smoke_test --layer xai
+    python -m maestro.tests.system_smoke           # full suite
+    python -m maestro.tests.system_smoke --fast    # skip RL + XAI
+    python -m maestro.tests.system_smoke --layer data
+    python -m maestro.tests.system_smoke --layer regime
+    python -m maestro.tests.system_smoke --layer signal
+    python -m maestro.tests.system_smoke --layer risk
+    python -m maestro.tests.system_smoke --layer orchestrator
+    python -m maestro.tests.system_smoke --layer compliance
+    python -m maestro.tests.system_smoke --layer monitoring
+    python -m maestro.tests.system_smoke --layer xai
 
 Exit codes
 ----------

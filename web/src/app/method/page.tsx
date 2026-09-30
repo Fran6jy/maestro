@@ -224,7 +224,7 @@ export default function MethodPage() {
             <pre className={styles.code}><code>{`python -m maestro.data.pipeline.store fetch --start 2005-01-01
 python -m maestro.data.pipeline.store sync
 python -m maestro.backtesting.baselines --refit-months 3 --train-months 12
-python -m pytest maestro/tests --ignore=maestro/tests/smoke_test.py
+python -m pytest maestro/tests
 python -m maestro.demo.export_web_data`}</code></pre>
             <p>
               The first two build the price and macro store and the features; the third scores every

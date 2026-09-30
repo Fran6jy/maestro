@@ -102,20 +102,30 @@ its own:
 
 ## Repository layout
 
+The evaluated pipeline:
+
 ```
-agents/          the six agents (regime, signal, sentiment, risk, execution)
-orchestrator/    rule-based and LLM orchestrators
-backtesting/     walk-forward engine, causal portfolio ledger, baselines.py (the shared evaluator)
-data/            connectors, feature engineering, labelling, walk-forward splits
-trader/          paper-trading engine, portfolio allocator, read-only OANDA client
-shared/          contracts shared between research and trading code
-tests/           unit tests, including no-look-ahead checks for the evaluator
-demo/            data export for the website
-cloud/           runs retraining blocks on Kaggle's free GPUs
+backtesting/     baselines.py (the shared evaluator), maestro_runner.py, power_test.py, risk_layer.py
+agents/          regime and signal agents (trained by maestro_runner), risk agent (tested by risk_layer)
+data/            raw store and daily ingestion, feature engineering, macro timing, walk-forward splits
 live/            the live trial: forecasts, decisions, paper ledger, practice orders
+cloud/           runs retraining blocks on Kaggle's free GPUs
 deploy/live/     Docker setup for the live trial
+demo/            data export for the website
 web/             the public website (Next.js, deployed on Vercel)
+tests/           look-ahead, data timing, causal regimes, store, runner and live-parity tests
 docs/            thesis narrative and design documents
+```
+
+Parked: part of the MAESTRO design, not yet in the evaluated pipeline:
+
+```
+agents/          sentiment (FinBERT + GPT-4o) and execution agents, per-agent training scripts
+orchestrator/    rule-based and LLM orchestrators
+compliance/, monitoring/, xai/   limits, dashboards and SHAP explanations for the original live loop
+backtesting/     backtest_engine.py and portfolio_ledger.py (the original single-run backtest)
+trader/, shared/ multi-asset paper-trading groundwork for the cross-asset extension
+tests/system_smoke.py   end-to-end smoke run of the original system (python -m maestro.tests.system_smoke)
 ```
 
 ## Reproducing the results
@@ -138,7 +148,7 @@ with an OANDA account (a free practice account works) and a free FRED API key, s
 python -m maestro.data.pipeline.store fetch --start 2005-01-01   # candles + FRED into $MAESTRO_DATA_DIR/raw
 python -m maestro.data.pipeline.store sync                       # rebuild the feature table
 python -m maestro.backtesting.maestro_runner --refit-months 3 --train-months 12 --fast
-python -m pytest maestro/tests --ignore=maestro/tests/smoke_test.py   # look-ahead, timing, store, runner
+python -m pytest maestro/tests                                   # look-ahead, timing, store, runner, live
 python -m maestro.demo.export_web_data                           # rebuild the website's data
 ```
 

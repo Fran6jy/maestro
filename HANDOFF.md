@@ -103,7 +103,7 @@ python -m maestro.cloud.kaggle.collect                                       # b
 python -m maestro.backtesting.power_test                                     # planted-edge check
 python -m maestro.backtesting.risk_layer --refit-months 3 --train-months 12 --fast
 python -m maestro.live.deploy --out C:\tmp\maestro_live\models\<date>       # live model
-python -m pytest maestro/tests --ignore=maestro/tests/smoke_test.py
+python -m pytest maestro/tests
 python -m maestro.demo.export_web_data                                       # refresh web/src/data/*.json
 cd maestro/web && npm run build && vercel deploy --prod --yes                # redeploy the site
 ```

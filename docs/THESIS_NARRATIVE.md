@@ -38,6 +38,6 @@ These are built or designed, but they don't serve the core sentence yet:
 - Cross-asset v2 (gold, SPY) — `docs/MAESTRO_V2_ARCHITECTURE.md`
 - LLM orchestrator — possible extra ablation in chapter 7, not a dependency
 - Demo / presentation layer — `docs/MAESTRO_DUAL_LAYER_DESIGN.md`, for the viva, not the evidence.
-  Stage 1 exists: the plain-language findings page built from real results by
-  `demo/findings/build_page.py`. It grows as chapters 7 and 8 produce results.
+  The public website (`web/`, built only from exported results) now does this job; it
+  grows as chapters 7 and 8 produce results.
 - Live trading with real money — out of scope

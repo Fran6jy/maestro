@@ -281,7 +281,7 @@ def feature_file(instrument: str, granularity: str = "M5") -> Path:
 
 
 def make_wfa(close: pd.Series):
-    """Identical split configuration to backtest_engine and modal_edge."""
+    """The walk-forward splits every design uses, derived from the data (as backtest_engine does)."""
     from maestro.data.validation.wfa import WalkForwardEngine
     start, end = close.index[0], close.index[-1]
     return WalkForwardEngine(

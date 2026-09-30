@@ -39,5 +39,5 @@ except ImportError as e:
     sys.exit(1)
 
 # Now run the smoke test
-from maestro.tests.smoke_test import main
+from maestro.tests.system_smoke import main
 sys.exit(main())
