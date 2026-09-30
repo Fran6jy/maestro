@@ -110,7 +110,8 @@ def test_refit_plan_covers_the_same_months_under_both_designs():
 
 
 def test_maestro_positions_gate_and_carry_through_unscorable_bars():
-    from maestro.backtesting.maestro_runner import MAX_CARRY_BARS, positions
+    from maestro.backtesting.maestro_runner import position_windows, positions
+    MAX_CARRY_BARS = position_windows("M5")[2]
     bars = pd.date_range("2024-01-01", periods=40, freq="5min", tz="UTC")
     scored = bars.delete([3] + list(range(10, 10 + MAX_CARRY_BARS + 2)))   # one short gap, one long
     signals = pd.DataFrame({"signal": 1, "confidence": 0.9, "regime": 2}, index=scored)

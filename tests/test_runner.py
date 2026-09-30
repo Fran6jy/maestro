@@ -18,7 +18,7 @@ def _close():
 
 
 def _stub(calls):
-    def train_and_predict(df, train_idx, test_idx, instrument, epochs, fast=False):
+    def train_and_predict(df, train_idx, test_idx, instrument, epochs, fast=False, granularity="M5"):
         calls.append(test_idx[0])
         sig = pd.DataFrame({"signal": 1.0, "confidence": 0.9, "regime": 2}, index=test_idx)
         return sig, {"fit_bars": len(train_idx)}
@@ -69,3 +69,18 @@ def test_limit_trains_at_most_n_blocks_per_call(tmp_path, monkeypatch):
     runner.run_design(close, tmp_path, "EUR_USD", lambda: None, limit=1)
     runner.run_design(close, tmp_path, "EUR_USD", lambda: None, limit=1)
     assert len(calls) == 2 == len(set(calls))              # a second call picks up the next block
+
+
+def test_five_minute_position_rules_are_unchanged():
+    assert runner.position_windows("M5") == (1440, 288, 12)      # as fixed for Chapter 7
+    assert runner.position_windows("D") == (60, 20, 1)            # floors for long bars
+
+
+def test_longer_bars_never_fall_back_to_five_minute_features(tmp_path, monkeypatch):
+    import pytest
+    import maestro.backtesting.baselines as b
+    monkeypatch.setattr(b, "DATA_DIR", tmp_path)
+    (tmp_path / "EUR_USD_features.parquet").write_bytes(b"")     # only the 5-minute file exists
+    assert b.feature_file("EUR_USD", "M5").name == "EUR_USD_features.parquet"
+    with pytest.raises(FileNotFoundError):
+        b.feature_file("EUR_USD", "H1")

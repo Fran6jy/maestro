@@ -39,7 +39,7 @@ import numpy as np
 import pandas as pd
 
 from maestro.backtesting.baselines import (
-    DATA_DIR, OUTPUT_DIR, design_tag, load_close, refit_plan, run as score_strategies,
+    OUTPUT_DIR, design_tag, feature_file, load_close, refit_plan, run as score_strategies,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,18 +55,15 @@ WARMUP_BARS = 400       # history fed before each test block so sequence models 
 FAST_TFT = {"batch_size": 256, "patience": 10}
 
 
-def load_features(instrument: str) -> pd.DataFrame:
+def load_features(instrument: str, granularity: str = "M5") -> pd.DataFrame:
     """Full feature parquet, with the sealed holdout dropped unless unlocked."""
     from maestro.data.holdout import seal
-    for name in (f"{instrument}_M5_features.parquet", f"{instrument}_features.parquet"):
-        path = DATA_DIR / name
-        if path.exists():
-            return seal(pd.read_parquet(path).sort_index())
-    raise FileNotFoundError(f"No feature parquet for {instrument} in {DATA_DIR}")
+    return seal(pd.read_parquet(feature_file(instrument, granularity)).sort_index())
 
 
 def train_and_predict(df: pd.DataFrame, train_idx: pd.Index, test_idx: pd.Index,
-                      instrument: str, epochs: int, fast: bool = False) -> tuple[pd.DataFrame, dict]:
+                      instrument: str, epochs: int, fast: bool = False,
+                      granularity: str = "M5") -> tuple[pd.DataFrame, dict]:
     """Fit regime + signal agents on train_idx, forecast every bar of test_idx."""
     from maestro.agents.regime.regime_classifier import RegimeDetectionAgent
     from maestro.agents.regime.transformer_regime import TransformerConfig
@@ -79,7 +76,7 @@ def train_and_predict(df: pd.DataFrame, train_idx: pd.Index, test_idx: pd.Index,
     val_mask = train_df.index >= val_cut
     val_df = train_df[val_mask].dropna() if val_mask.sum() > 200 else None
     fit_df = (train_df[~val_mask] if val_df is not None else train_df).dropna()
-    if len(fit_df) < 1000:
+    if len(fit_df) < MIN_FIT_BARS.get(granularity, 1000):
         raise ValueError(f"only {len(fit_df)} usable training bars after dropping missing features")
 
     meta = {"fit_bars": len(fit_df), "val_bars": 0 if val_df is None else len(val_df)}
@@ -119,12 +116,24 @@ def train_and_predict(df: pd.DataFrame, train_idx: pd.Index, test_idx: pd.Index,
     return out, meta
 
 
-MAX_CARRY_BARS = 12     # hold the last decision through at most an hour of unscorable bars
 TOP_SHARE = 0.10        # maestro_top10: share of calls confident enough to trade
-TOP_LOOKBACK = 1440     # bars of past confidence the cut-off is taken from (five trading days)
+BARS_PER_DAY = {"M5": 288, "H1": 24, "H4": 6, "D": 1}
+MIN_FIT_BARS = {"M5": 1000, "H1": 1000, "H4": 600, "D": 300}   # below this a block is not trained
+# Long bars start the design once a training window holds enough bars (the regime model's
+# HMM alone needs 500); shorter bars start at the first walk-forward month, as before.
+MIN_TRAIN_BARS = {"M5": 0, "H1": 0, "H4": 1200, "D": 650}
 
 
-def positions(signals: pd.DataFrame, bars: pd.Index) -> dict[str, pd.Series]:
+def position_windows(granularity: str = "M5") -> tuple[int, int, int]:
+    """(cut-off lookback, its minimum history, max bars to carry a decision) for a bar length.
+    On 5-minute bars: five trading days, one day and one hour, as fixed for Chapter 7.
+    Longer bars keep the same spans in time, with a floor so a cut-off never rests on a
+    handful of values."""
+    per_day = BARS_PER_DAY[granularity]
+    return max(5 * per_day, 60), max(per_day, 20), max(1, per_day // 24)
+
+
+def positions(signals: pd.DataFrame, bars: pd.Index, granularity: str = "M5") -> dict[str, pd.Series]:
     """Turn saved forecasts into the two position series that get scored.
 
     About 0.3% of bars have a missing feature (candle shape is 0/0 when
@@ -137,11 +146,12 @@ def positions(signals: pd.DataFrame, bars: pd.Index) -> dict[str, pd.Series]:
     threshold = signals["regime"].astype(int).map(CONFIDENCE_THRESHOLDS).fillna(0.55)
     gated = sig.where(signals["confidence"] >= threshold, 0.0)
     # Cut-off from strictly earlier bars only (shift(1)), so no bar sees its own confidence rank.
-    cutoff = (signals["confidence"].rolling(TOP_LOOKBACK, min_periods=288)
+    lookback, min_history, max_carry = position_windows(granularity)
+    cutoff = (signals["confidence"].rolling(lookback, min_periods=min_history)
               .quantile(1 - TOP_SHARE).shift(1))
     top = sig.where(signals["confidence"] >= cutoff, 0.0)
     bars = bars[(bars >= signals.index[0]) & (bars <= signals.index[-1])]
-    carry = lambda s: s.reindex(bars).ffill(limit=MAX_CARRY_BARS).fillna(0.0)
+    carry = lambda s: s.reindex(bars).ffill(limit=max_carry).fillna(0.0)
     return {"maestro_gated": carry(gated), "maestro_top10": carry(top), "maestro_ungated": carry(sig)}
 
 
@@ -150,6 +160,8 @@ def main() -> None:
                         datefmt="%H:%M:%S")
     p = argparse.ArgumentParser(description="Chapter 7: MAESTRO on the shared evaluator")
     p.add_argument("--instrument", default="EUR_USD")
+    p.add_argument("--granularity", default="M5", choices=list(BARS_PER_DAY),
+                   help="bar length (features from: store sync --granularity ...)")
     p.add_argument("--refit-months", type=int, default=3)
     p.add_argument("--train-months", type=int, default=12)
     p.add_argument("--expanding", action="store_true", help="train on all history instead of a rolling window")
@@ -175,15 +187,18 @@ def main() -> None:
 
     train_months = None if args.expanding else args.train_months
     epochs = args.epochs or (1 if args.smoke else EPOCHS)
-    tag = design_tag(args.refit_months, train_months) + ("_fast" if args.fast else "")
+    prefix = "" if args.granularity == "M5" else f"{args.granularity}_"
+    tag = prefix + design_tag(args.refit_months, train_months) + ("_fast" if args.fast else "")
     out_dir = OUTPUT_DIR / "maestro" / (tag + ("_smoke" if args.smoke else ""))
 
-    pooled = run_design(load_close(args.instrument), out_dir, args.instrument,
-                        lambda: load_features(args.instrument), args.refit_months, train_months,
+    pooled = run_design(load_close(args.instrument, args.granularity), out_dir, args.instrument,
+                        lambda: load_features(args.instrument, args.granularity),
+                        args.refit_months, train_months,
                         epochs, max_blocks=1 if args.smoke else None, train=not args.score_only,
                         fast=args.fast, shard=tuple(map(int, args.shard.split("/"))) if args.shard else None,
                         reverse=args.reverse, skip=parse_ids(args.skip), limit=args.limit,
-                        deadline=time.time() + args.max_hours * 3600 if args.max_hours else None)
+                        deadline=time.time() + args.max_hours * 3600 if args.max_hours else None,
+                        granularity=args.granularity)
     if pooled is not None:
         print_summary(pooled)
 
@@ -214,7 +229,8 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
                train_months: int | None = 12, epochs: int = EPOCHS, max_blocks: int | None = None,
                train: bool = True, fast: bool = False, shard: tuple[int, int] | None = None,
                reverse: bool = False, deadline: float | None = None,
-               skip: set[int] | None = None, limit: int | None = None) -> pd.DataFrame | None:
+               skip: set[int] | None = None, limit: int | None = None,
+               granularity: str = "M5") -> pd.DataFrame | None:
     """Train MAESTRO block by block (resumable), then score it with every baseline.
 
     features : callable returning the feature table, only called if a block needs training.
@@ -227,7 +243,7 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
     Returns the pooled scores, or None if some blocks are still missing.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    blocks = refit_plan(close, refit_months, train_months)
+    blocks = refit_plan(close, refit_months, train_months, min_train_bars=MIN_TRAIN_BARS[granularity])
     full = len(blocks)
     if max_blocks:
         blocks = blocks[:max_blocks]
@@ -257,7 +273,7 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
             logger.info("block %d/%d: training on %d bars (%s -> %s), testing %s -> %s",
                         b.block_id + 1, len(blocks), len(b.train_idx), b.train_idx[0].date(),
                         b.train_idx[-1].date(), b.splits[0].test_start.date(), b.splits[-1].test_end.date())
-            sig, meta = train_and_predict(df, b.train_idx, b.test_idx, instrument, epochs, fast)
+            sig, meta = train_and_predict(df, b.train_idx, b.test_idx, instrument, epochs, fast, granularity)
             meta.update({"block_id": b.block_id, "minutes": round((time.time() - t0) / 60, 1)})
             tmp = path.with_suffix(".tmp")
             sig.to_parquet(tmp)
@@ -274,11 +290,12 @@ def run_design(close: pd.Series, out_dir: Path, instrument: str, features, refit
                        len(files) - len(missing), len(files))
         return None
     signals = pd.concat(pd.read_parquet(f) for f in files).sort_index()
-    pos = positions(signals, close.index)
+    pos = positions(signals, close.index, granularity)
     pooled, _ = score_strategies(instrument, strategies=None,
                                  max_splits=blocks[-1].splits[-1].split_id + 1 if len(blocks) < full else None,
                                  refit_months=refit_months, train_months=train_months,
-                                 external=pos, out_dir=out_dir / "scores", close=close)
+                                 external=pos, out_dir=out_dir / "scores", close=close,
+                                 min_train_bars=MIN_TRAIN_BARS[granularity])
     return pooled
 
 

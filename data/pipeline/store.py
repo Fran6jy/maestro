@@ -224,18 +224,51 @@ def raw_checks(instrument: str, now: pd.Timestamp) -> dict:
 
 
 # ── Features ─────────────────────────────────────────────────────────────────
-def build_features(raw: pd.DataFrame | None = None) -> pd.DataFrame:
+# Longer bars for the horizon sweep, built from the 5-minute candles with the usual
+# FX alignment: hourly on the hour, 4-hourly from 22:00 UTC, daily from one New York
+# close (22:00 UTC) to the next. A bar is labelled by its start and only uses candles
+# inside it, so its close is known when the bar ends; macro values are matched at the
+# label (the bar's start), which is conservative.
+BARS = {"M5": None, "H1": ("1h", "0h"), "H4": ("4h", "2h"), "D": ("24h", "22h")}   # "24h", not "1D": pandas ignores offsets on calendar days
+MINUTES = {"M5": 5, "H1": 60, "H4": 240, "D": 1440}
+_AGG = {"open": "first", "high": "max", "low": "min", "close": "last",
+        "bid_close": "last", "ask_close": "last", "volume": "sum"}
+
+
+MIN_FILL = 0.3          # a longer bar needs this share of its 5-minute candles to count
+
+
+def resample_candles(raw: pd.DataFrame, granularity: str) -> pd.DataFrame:
+    """Longer bars from 5-minute candles. Weekends and holidays leave no bar, and a stub
+    bar with under MIN_FILL of its candles (the hour of Sunday trading before 22:00 UTC in
+    summer) is dropped; its price move is still counted in the next bar's return."""
+    if BARS[granularity] is None:
+        return raw
+    rule, offset = BARS[granularity]
+    grouped = raw.resample(rule, offset=offset, label="left", closed="left")
+    out = grouped.agg(_AGG)
+    candles = grouped["close"].count()
+    return out[candles >= MIN_FILL * MINUTES[granularity] / 5].dropna(subset=["close"])
+
+
+def feature_path(granularity: str = "M5") -> Path:
+    name = f"{TARGET}_features.parquet" if granularity == "M5" else f"{TARGET}_{granularity}_features.parquet"
+    return DATA_DIR / name
+
+
+def build_features(raw: pd.DataFrame | None = None, granularity: str = "M5") -> pd.DataFrame:
     """Rebuild the full feature table for TARGET from the raw store.
 
-    raw : optional replacement candles for TARGET (the power test passes prices
-          with a planted edge); the other pair and FRED always come from the store.
+    raw         : optional replacement 5-minute candles for TARGET (the power test passes
+                  prices with a planted edge); the other pair and FRED always come from the store.
+    granularity : bar length, one of BARS; indicators are computed on those bars.
     """
     from maestro.data.features.engineer import FeatureEngineer, add_cross_pair_features
     from maestro.data.features.macro import macro_frame
 
     fe = FeatureEngineer()
     ohlcv = ["open", "high", "low", "close", "volume"]
-    raw = load_candles(TARGET) if raw is None else raw
+    raw = resample_candles(load_candles(TARGET) if raw is None else raw, granularity)
     feats = fe.transform(raw[ohlcv], drop_nan=False)
     feats["bid_close"], feats["ask_close"] = raw["bid_close"], raw["ask_close"]
     feats["spread_pips"] = (raw["ask_close"] - raw["bid_close"]) / PIP
@@ -243,7 +276,7 @@ def build_features(raw: pd.DataFrame | None = None) -> pd.DataFrame:
     feats = pd.concat([feats, macro_frame(load_fred(), feats.index)], axis=1)
 
     other = next(i for i in INSTRUMENTS if i != TARGET)
-    other_feats = fe.transform(load_candles(other)[ohlcv], drop_nan=False)
+    other_feats = fe.transform(resample_candles(load_candles(other), granularity)[ohlcv], drop_nan=False)
     feats, _ = add_cross_pair_features(feats, other_feats)
     return feats
 
@@ -260,21 +293,23 @@ def fetch(start: str) -> dict:
     return status
 
 
-def sync() -> dict:
-    """Pull the raw store (if it is a git clone) and rebuild the feature table."""
+def sync(granularities: tuple[str, ...] = ("M5",)) -> dict:
+    """Pull the raw store (if it is a git clone) and rebuild the feature tables."""
     if (RAW / ".git").exists():
         subprocess.run(["git", "-C", str(RAW), "pull", "--ff-only", "--quiet"], check=True)
-    feats = build_features()
-    path = DATA_DIR / f"{TARGET}_features.parquet"
-    legacy = DATA_DIR / f"{TARGET}_features_legacy_2022_2026.parquet"
-    if path.exists() and not legacy.exists():
-        path.replace(legacy)        # keep the file the published Chapter 5-7 numbers came from
-    _atomic_parquet(feats, path)
-    status = {"rows": len(feats), "cols": feats.shape[1],
-              "first": str(feats.index[0]), "last": str(feats.index[-1]),
-              "ok": bool(feats["VIXCLS"].iloc[-2000:].notna().any())}
-    logger.info("Features rebuilt: %s rows x %d cols, %s -> %s", f"{status['rows']:,}", status["cols"],
-                status["first"], status["last"])
+    status = {"ok": True}
+    for g in granularities:
+        feats = build_features(granularity=g)
+        path = feature_path(g)
+        legacy = DATA_DIR / f"{TARGET}_features_legacy_2022_2026.parquet"
+        if g == "M5" and path.exists() and not legacy.exists():
+            path.replace(legacy)    # keep the file the published Chapter 5-7 numbers came from
+        _atomic_parquet(feats, path)
+        status[g] = {"rows": len(feats), "cols": feats.shape[1],
+                     "first": str(feats.index[0]), "last": str(feats.index[-1])}
+        status["ok"] &= bool(feats["VIXCLS"].iloc[-2000:].notna().any())
+        logger.info("%s features rebuilt: %s rows x %d cols, %s -> %s", g, f"{len(feats):,}",
+                    feats.shape[1], feats.index[0], feats.index[-1])
     return status
 
 
@@ -289,11 +324,13 @@ def main() -> None:
     p = argparse.ArgumentParser(description="MAESTRO raw store, ingestion and feature rebuild")
     p.add_argument("mode", choices=["fetch", "sync", "status"])
     p.add_argument("--start", default="2005-01-01", help="first date for an empty store")
+    p.add_argument("--granularity", nargs="+", default=["M5"], choices=list(BARS),
+                   help="bar lengths to rebuild features for (sync)")
     args = p.parse_args()
     if args.mode == "status":
         print((RAW / "status.json").read_text())
         return
-    status = fetch(args.start) if args.mode == "fetch" else sync()
+    status = fetch(args.start) if args.mode == "fetch" else sync(tuple(args.granularity))
     logger.log(logging.INFO if status["ok"] else logging.ERROR, "%s %s", args.mode,
                "OK" if status["ok"] else f"FAILED CHECKS: {status.get('checks')}")
     raise SystemExit(0 if status["ok"] else 1)

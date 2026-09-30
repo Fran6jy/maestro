@@ -46,3 +46,27 @@ def test_rewriting_the_same_candles_changes_nothing(store):
     st.write_candles("EUR_USD", df, now)
     st.write_candles("EUR_USD", df.iloc[-500:], now)
     assert st.load_candles("EUR_USD").equals(df)
+
+
+@pytest.mark.parametrize("granularity, length", [("H1", "1h"), ("H4", "4h"), ("D", "1D")])
+def test_longer_bars_only_use_candles_inside_them(granularity, length):
+    five = _candles("2026-09-01", "2026-09-10")
+    bars = st.resample_candles(five, granularity)
+    for start in bars.index[1:6]:
+        inside = five[(five.index >= start) & (five.index < start + pd.Timedelta(length))]
+        bar = bars.loc[start]
+        assert bar["open"] == inside["open"].iloc[0] and bar["close"] == inside["close"].iloc[-1]
+        assert bar["high"] == inside["high"].max() and bar["low"] == inside["low"].min()
+        assert bar["volume"] == inside["volume"].sum()
+
+
+def test_daily_bars_run_from_new_york_close_to_new_york_close():
+    bars = st.resample_candles(_candles("2026-09-01", "2026-09-05"), "D")
+    assert (bars.index.hour == 22).all()
+
+
+def test_stub_bars_with_few_candles_are_dropped():
+    five = _candles("2026-09-06 21:00", "2026-09-08 22:00")     # starts with one hour of Sunday trading
+    days = st.resample_candles(five, "D")
+    assert pd.Timestamp("2026-09-05 22:00", tz="UTC") not in days.index   # the Sunday-hour stub
+    assert pd.Timestamp("2026-09-06 22:00", tz="UTC") in days.index

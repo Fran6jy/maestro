@@ -258,11 +258,20 @@ def load_close(instrument: str, granularity: str = "M5") -> pd.Series:
     The sealed holdout (maestro.data.holdout) is dropped unless unlocked.
     """
     from maestro.data.holdout import seal
-    for name in (f"{instrument}_{granularity}_features.parquet", f"{instrument}_features.parquet"):
-        path = DATA_DIR / name
-        if path.exists():
-            return seal(pd.read_parquet(path, columns=["close"])["close"].sort_index())
-    raise FileNotFoundError(f"No feature parquet for {instrument} in {DATA_DIR}")
+    return seal(pd.read_parquet(feature_file(instrument, granularity), columns=["close"])["close"].sort_index())
+
+
+def feature_file(instrument: str, granularity: str = "M5") -> Path:
+    """The feature table for one bar length. Longer bars never fall back to the
+    5-minute file: silently scoring the wrong bars would be worse than failing."""
+    names = [f"{instrument}_{granularity}_features.parquet"]
+    if granularity == "M5":
+        names.append(f"{instrument}_features.parquet")
+    for name in names:
+        if (DATA_DIR / name).exists():
+            return DATA_DIR / name
+    raise FileNotFoundError(f"No {granularity} feature parquet for {instrument} in {DATA_DIR}; "
+                            f"run: python -m maestro.data.pipeline.store sync --granularity {granularity}")
 
 
 def make_wfa(close: pd.Series):
@@ -294,7 +303,7 @@ def design_tag(refit_months: int, train_months: int | None) -> str:
 
 
 def refit_plan(close: pd.Series, refit_months: int = 1, train_months: int | None = None,
-               max_splits: int | None = None) -> list[RefitBlock]:
+               max_splits: int | None = None, min_train_bars: int = 0) -> list[RefitBlock]:
     """
     Group the monthly walk-forward test windows into retraining blocks.
 
@@ -305,6 +314,10 @@ def refit_plan(close: pd.Series, refit_months: int = 1, train_months: int | None
 
     The training window always ends `embargo_days` before the block's first test month,
     so months two and three of a block are even further out of sample.
+
+    min_train_bars drops leading blocks whose training window is shorter, so on long bars
+    (4-hour, daily) the design starts once there is enough history. Every strategy is
+    scored on the same remaining months.
     """
     splits = [s for s in make_wfa(close).splits(close.to_frame()) if len(s.train_idx) >= 500]
     if max_splits is not None:
@@ -317,7 +330,9 @@ def refit_plan(close: pd.Series, refit_months: int = 1, train_months: int | None
             cutoff = group[0].test_start - pd.DateOffset(months=train_months)
             train_idx = train_idx[train_idx >= cutoff]
         blocks.append(RefitBlock(b, train_idx, group))
-    return blocks
+    while blocks and len(blocks[0].train_idx) < min_train_bars:
+        blocks.pop(0)
+    return [RefitBlock(i, b.train_idx, b.splits) for i, b in enumerate(blocks)]
 
 
 def default_cost_scenarios(instrument: str) -> dict[str, float]:
@@ -331,7 +346,7 @@ def run(instrument: str = "EUR_USD", max_splits: int | None = None,
         strategies: list[str] | None = None, out_dir: Path | None = None,
         refit_months: int = 1, train_months: int | None = None,
         external: dict[str, pd.Series] | None = None,
-        close: pd.Series | None = None,
+        close: pd.Series | None = None, min_train_bars: int = 0,
         ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Score strategies over the walk-forward test months.
@@ -349,7 +364,7 @@ def run(instrument: str = "EUR_USD", max_splits: int | None = None,
     external = external or {}
     all_names = names + list(external)
     costs = default_cost_scenarios(instrument)
-    blocks = refit_plan(close, refit_months, train_months, max_splits)
+    blocks = refit_plan(close, refit_months, train_months, max_splits, min_train_bars)
 
     windows: dict[str, list[WindowResult]] = {n: [] for n in all_names}
     split_rows = []
