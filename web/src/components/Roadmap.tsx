@@ -9,22 +9,22 @@ const ITEMS = [
   {
     status: ["pill-done", "Done"],
     title: "A fair test",
-    body: "39 walk-forward months, one shared scorer, and automated checks that no strategy sees the future.",
+    body: "20 years of walk-forward months, one shared scorer, macro data used only once published, a sealed final test period, and automated checks that no strategy sees the future.",
   },
   {
     status: ["pill-done", "Done"],
     title: "The baselines",
-    body: "Every MSc strategy loses money after costs. Buy and hold is the only positive result.",
+    body: "Over 20 years the models that learn from past moves call the next move right about 52% of the time, a real edge, but it earns under a pip per trade. Every strategy loses money after costs.",
   },
   {
-    status: ["pill-done", "Done"],
+    status: ["pill-next", "Re-running"],
     title: "MAESTRO vs the baselines",
-    body: "Same months, costs and scoring code. MAESTRO's calls are no better than a coin flip, even before costs. It loses less than the busiest MSc models only because it trades less. Buy and hold still wins.",
+    body: "Same months, costs and scoring code. Being re-run after a bug let MAESTRO's regime labels see later prices; earlier MAESTRO results are withdrawn.",
   },
   {
-    status: ["pill-next", "Next"],
+    status: ["pill-next", "Shakedown"],
     title: "Live practice trial",
-    body: "MAESTRO and the MSc strategies trade side by side on an OANDA practice account, checked daily against the backtest. No real money.",
+    body: "MAESTRO and the MSc strategies trade side by side on every 5-minute bar, paper-traded at live OANDA prices, and one MAESTRO version will also place orders on a practice account. Running as a paper-only shakedown now; the trial proper starts once MAESTRO's results are corrected. No real money.",
   },
   {
     status: ["pill-later", "Later"],
@@ -47,7 +47,7 @@ export default function Roadmap() {
         </div>
         <ol className={styles.track}>
           {ITEMS.map((it, i) => (
-            <li key={it.title} className={`reveal ${styles.item}`} data-state={it.status[1].toLowerCase()}>
+            <li key={it.title} className={`reveal ${styles.item}`} data-state={it.status[0].replace("pill-", "")}>
               <div className={styles.marker} aria-hidden="true">
                 <span className={styles.dot} />
                 {i < ITEMS.length - 1 && <span className={styles.rail} />}

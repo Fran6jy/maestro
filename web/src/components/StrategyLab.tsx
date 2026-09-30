@@ -26,6 +26,8 @@ const GROUPS = [
   { id: "msc", label: "From my MSc" },
   { id: "ref", label: "Reference points" },
 ].filter((g) => RESULTS.strategies.some((st) => st.group === g.id));
+const PERIOD = `${RESULTS.months[0].label} to ${RESULTS.months[RESULTS.months.length - 1].label}`;
+const YEARS = Math.round(RESULTS.months.length / 12);
 const FIRST: StrategyKey = STRATEGY.maestro_top10 ? "maestro_top10" : "logreg_lag5";
 
 export default function StrategyLab() {
@@ -67,7 +69,8 @@ export default function StrategyLab() {
           <p className="eyebrow">Strategy Lab</p>
           <h2 id="lab-title">Drag the cost. Watch the money.</h2>
           <p className="lede">
-            Every strategy below traded EUR/USD for 39 months, each month without seeing it first.
+            Every strategy below traded EUR/USD for {RESULTS.months.length} months ({YEARS} years), each
+            month without seeing it first.
             Pick one, then move the slider from <strong>no costs</strong> to what a real broker charges.
             That one change decides whether a strategy makes money.
           </p>
@@ -77,9 +80,8 @@ export default function StrategyLab() {
           <p>
             <strong>MAESTRO&rsquo;s results are being re-run.</strong> On 30 September 2026 two look-ahead
             bugs were found and fixed: macro data reached the models before it was published, and
-            MAESTRO&rsquo;s market-regime labels used later prices. The MAESTRO results here come from before
-            the fixes, so don&rsquo;t rely on them. The other strategies use prices only and are unaffected.
-            Corrected results over 20 years will replace this section.
+            MAESTRO&rsquo;s market-regime labels used later prices. MAESTRO is left out of the Lab until its
+            corrected 20-year results are ready. The strategies shown use prices only and are unaffected.
           </p>
         </aside>
 
@@ -149,7 +151,7 @@ export default function StrategyLab() {
             </div>
 
             <div className={styles.headline} aria-live="polite">
-              <p className={styles.headLead}>£10,000 traded with {s.label}, Jan 2023 to Mar 2026</p>
+              <p className={styles.headLead}>£10,000 traded with {s.label}, {PERIOD}</p>
               <p className={`num ${styles.big} ${s.trades === 0 ? styles.idle : up ? styles.gain : styles.cool}`}>{gbp(shown)}</p>
               <p className={styles.headSub}>
                 at {cost.toFixed(2)} pips per trade · <span className={styles.amberText}>{gbp(endNo)}</span> with no costs

@@ -88,10 +88,12 @@ export default function MethodPage() {
           <section id="data">
             <h2>The data</h2>
             <p>
-              OANDA EUR/USD mid prices in 5-minute bars, from January 2022 to March 2026. The first
-              year is only ever used for training. Results cover {first} to {last}:{" "}
+              OANDA EUR/USD prices in 5-minute bars, with bid and ask, from January 2005. The first
+              year is only ever used for training, and everything from 7 March 2026 is sealed for one
+              final confirmation test, so results cover {first} to {last}:{" "}
               {RESULTS.dates.length.toLocaleString("en-GB")} trading days across {RESULTS.months.length}{" "}
-              monthly test windows.
+              monthly test windows. Macro data (VIX, US yields, interest rates and inflation) comes from
+              FRED and reaches a bar only once it had been published.
             </p>
           </section>
 
@@ -100,8 +102,8 @@ export default function MethodPage() {
             <p>
               Every three months, each model is retrained on the latest twelve months of data, then
               trades the next three months without having seen them. The window then moves forward
-              three months and the process repeats: 13 retrainings, 39 test months, each scored on its
-              own. A five-day gap separates training from testing, so no training label can overlap a
+              three months and the process repeats: {Math.ceil(RESULTS.months.length / 3)} retrainings,{" "}
+              {RESULTS.months.length} test months, each scored on its own. A five-day gap separates training from testing, so no training label can overlap a
               test price. Rules-based strategies such as the moving-average crossover have nothing to
               train, so they simply trade every month.
             </p>
@@ -118,6 +120,8 @@ export default function MethodPage() {
               spread in MAESTRO&rsquo;s cost model. Trades are one unit of EUR/USD with no leverage. The
               Strategy Lab&rsquo;s slider re-prices the same trades at any cost from 0 to 2 pips; because
               cost scales linearly with the number of trades, this is exact rather than an estimate.
+              OANDA&rsquo;s actual quoted spread, measured on every bar, had a median of 0.9&ndash;1.6 pips
+              depending on the year (1.5&ndash;1.6 since 2022), so 0.8 pips is on the generous side.
             </p>
           </section>
 
@@ -133,10 +137,21 @@ export default function MethodPage() {
               <li>a signal built from the current bar&rsquo;s own move scores about 50% on random data;</li>
               <li>the regression models only ever learn from their training window;</li>
               <li>no retraining ever uses data from the months it is about to trade;</li>
+              <li>macro data reaches a bar only once it was published;</li>
+              <li>market-regime labels use only the bars up to each bar, so rewriting later prices
+                cannot change an earlier label;</li>
               <li>MAESTRO&rsquo;s confidence cut-off only uses confidence from earlier bars.</li>
             </ul>
             <p>
-              See <a href={`${REPO}/tests/test_baselines.py`} target="_blank" rel="noreferrer">tests/test_baselines.py</a>.
+              Two of these checks exist because of bugs found on 30 September 2026. Macro values had
+              been stamped at midnight on the day they describe, so each bar saw that day&rsquo;s closing
+              VIX, and inflation six weeks before it was published. And MAESTRO&rsquo;s regime detector
+              labelled each bar using the whole three-month test block around it, so a label could depend
+              on later prices. Both are fixed; MAESTRO&rsquo;s earlier results are withdrawn and being
+              re-run. The other strategies use prices only and were not affected.
+            </p>
+            <p>
+              See <a href={`${REPO}/tests`} target="_blank" rel="noreferrer">the tests</a>.
             </p>
           </section>
 
@@ -166,8 +181,8 @@ export default function MethodPage() {
             </p>
             <p>
               MAESTRO forecasts the next 30 minutes with its regime, TFT and PatchTST agents, retrained
-              on the same schedule on a laptop GPU, with two months of each training window held back to
-              stop training early. How forecasts become trades is a design choice, so three versions
+              on the same schedule, with two months of each training window held back to stop training
+              early. Its results are being re-run after the fixes above. How forecasts become trades is a design choice, so three versions
               were fixed before any result was seen: <strong>as designed</strong> (trade only above the
               confidence thresholds MAESTRO was built with), <strong>most confident 10%</strong> (the
               cut-off taken from the previous five trading days), and <strong>every signal</strong>.
@@ -190,25 +205,30 @@ export default function MethodPage() {
             <h2>Limitations</h2>
             <ul>
               <li>One currency pair so far. Other markets may behave differently.</li>
-              <li>Costs are a fixed spread per trade. Real spreads widen around news and overnight.</li>
+              <li>Costs are a fixed spread per trade. Real spreads are wider on average and widen further
+                around news and overnight.</li>
               <li>The MSc ran its moving-average strategy on daily bars; here it runs on 5-minute bars.</li>
-              <li>MAESTRO&rsquo;s first retraining had only seven weeks of usable data, because two
-                of its inputs need eight months of history before they exist.</li>
               <li>MAESTRO&rsquo;s model settings were not tuned. Tuning them on these months would
                 have let the test leak into the design.</li>
-              <li>This is a historical simulation. The live practice-account trial will measure how far reality differs.</li>
+              <li>This is a historical simulation. A live trial on an OANDA practice account, now in a
+                paper-only shakedown, will measure how far reality differs.</li>
             </ul>
           </section>
 
           <section id="reproduce">
             <h2>Reproduce it</h2>
-            <p>From a copy of the repository, with the price data in place:</p>
-            <pre className={styles.code}><code>{`python -m maestro.backtesting.maestro_runner --refit-months 3 --train-months 12
-python -m pytest maestro/tests/test_baselines.py
+            <p>
+              OANDA&rsquo;s prices may not be redistributed, so the repository has none. With your own
+              OANDA practice account and a free FRED key:
+            </p>
+            <pre className={styles.code}><code>{`python -m maestro.data.pipeline.store fetch --start 2005-01-01
+python -m maestro.data.pipeline.store sync
+python -m maestro.backtesting.baselines --refit-months 3 --train-months 12
+python -m pytest maestro/tests --ignore=maestro/tests/smoke_test.py
 python -m maestro.demo.export_web_data`}</code></pre>
             <p>
-              The first command trains MAESTRO (about four hours on a laptop GPU) and scores it alongside
-              every baseline; the last rebuilds the data this site is made from. Source:{" "}
+              The first two build the price and macro store and the features; the third scores every
+              baseline over 20 years; the last rebuilds the data this site is made from. Source:{" "}
               <a href={`${REPO}/backtesting/baselines.py`} target="_blank" rel="noreferrer">backtesting/baselines.py</a>{" "}
               and <a href={`${REPO}/backtesting/maestro_runner.py`} target="_blank" rel="noreferrer">backtesting/maestro_runner.py</a>.
             </p>

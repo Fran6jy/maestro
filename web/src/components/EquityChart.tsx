@@ -68,11 +68,15 @@ export default function EquityChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [W, noCost, atCost, hold]);
 
-  const years = [2023, 2024, 2025, 2026].map((yr) => ({
-    yr,
-    s: Math.max(x0, Date.UTC(yr, 0, 1)),
-    e: Math.min(x1, Date.UTC(yr + 1, 0, 1)),
-  })).filter((y) => y.e > y.s);
+  // Years come from the data; when they get narrow (20 years on a phone) only every
+  // `step`-th year is labelled and gridded, so labels never collide.
+  const firstYear = new Date(x0).getUTCFullYear();
+  const lastYear = new Date(x1).getUTCFullYear();
+  const yearPx = pw / Math.max(1, (x1 - x0) / (365.25 * 86_400_000));
+  const step = [1, 2, 5, 10].find((k) => k * yearPx >= 40) ?? 10;
+  const years = Array.from({ length: lastYear - firstYear + 1 }, (_, i) => firstYear + i)
+    .map((yr) => ({ yr, s: Math.max(x0, Date.UTC(yr, 0, 1)), e: Math.min(x1, Date.UTC(yr + 1, 0, 1)) }))
+    .filter((y) => y.e > y.s && (step === 1 || y.yr % step === 0));
 
   const last = noCost.length - 1;
   const ends = [
@@ -122,9 +126,17 @@ export default function EquityChart({
 
         {years.map((y, i) => (
           <g key={y.yr}>
-            {i > 0 && <line x1={X(y.s)} x2={X(y.s)} y1={m.t} y2={m.t + ph + 6} className={styles.grid} />}
-            {X(y.e) - X(y.s) > 36 && (
-              <text x={(X(y.s) + X(y.e)) / 2} y={m.t + ph + 20} className={styles.axis} textAnchor="middle">
+            {(i > 0 || step > 1) && X(y.s) > m.l && (
+              <line x1={X(y.s)} x2={X(y.s)} y1={m.t} y2={m.t + ph + 6} className={styles.grid} />
+            )}
+            {step === 1 ? (
+              X(y.e) - X(y.s) > 36 && (
+                <text x={(X(y.s) + X(y.e)) / 2} y={m.t + ph + 20} className={styles.axis} textAnchor="middle">
+                  {y.yr}
+                </text>
+              )
+            ) : (
+              <text x={X(y.s)} y={m.t + ph + 20} className={styles.axis} textAnchor="middle">
                 {y.yr}
               </text>
             )}
@@ -145,14 +157,15 @@ export default function EquityChart({
         {months.map((mo, i) => {
           const xa = X(Math.max(mo.start, x0));
           const xb = X(Math.min(mo.end, x1));
+          const gap = Math.min(1.5, (xb - xa) * 0.2);    // 243 months on a phone leave ~1 px each
           return (
             <rect
               key={mo.label}
-              x={xa + 0.75}
+              x={xa + gap / 2}
               y={stripY}
-              width={Math.max(1, xb - xa - 1.5)}
+              width={Math.max(0.6, xb - xa - gap)}
               height={14}
-              rx={2}
+              rx={Math.min(2, (xb - xa) / 3)}
               className={monthNet[i] > 0 ? styles.mGain : styles.mLoss}
             >
               <title>{`${mo.label}: ${signed(monthNet[i], 0)} pips at ${costLabel}`}</title>
