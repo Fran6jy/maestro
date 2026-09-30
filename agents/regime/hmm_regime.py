@@ -161,9 +161,34 @@ class HMMRegimeDetector:
         return self
 
     # ── Predict ───────────────────────────────────────────────────────────────
-    def predict(self, df: pd.DataFrame) -> pd.Series:
+    def _filtered_posteriors(self, X: np.ndarray) -> np.ndarray:
+        """P(state_t | bars 1..t): the forward recursion only, so no bar sees later bars.
+
+        hmmlearn's predict (Viterbi) and score_samples (forward-backward) use the whole
+        sequence, so a bar's state there depends on bars after it. That is fine for
+        labelling training data after the fact, and a look-ahead leak for any bar that
+        is being predicted.
+        """
+        log_emit = self.model._compute_log_likelihood(X)
+        log_trans = np.log(np.maximum(self.model.transmat_, 1e-300))
+        log_alpha = np.log(np.maximum(self.model.startprob_, 1e-300)) + log_emit[0]
+        out = np.empty_like(log_emit)
+        for t in range(len(X)):
+            if t:
+                prev = log_alpha[:, None] + log_trans
+                m = prev.max(axis=0)
+                log_alpha = m + np.log(np.exp(prev - m).sum(axis=0)) + log_emit[t]
+            log_alpha = log_alpha - (log_alpha.max() + np.log(np.exp(log_alpha - log_alpha.max()).sum()))
+            out[t] = np.exp(log_alpha)
+        return out
+
+    def predict(self, df: pd.DataFrame, causal: bool = True) -> pd.Series:
         """
         Predict regime for each bar.
+
+        causal=True (default) uses only bars up to each bar (forward filtering), as any
+        prediction must. causal=False gives the Viterbi path over the whole sequence,
+        which is only for labelling training data after the fact.
 
         Returns
         -------
@@ -172,13 +197,14 @@ class HMMRegimeDetector:
         """
         self._check_fitted()
         X, _ = self._prepare(df)
-        raw_states = self.model.predict(X)
+        raw_states = self._filtered_posteriors(X).argmax(axis=1) if causal else self.model.predict(X)
         regimes    = np.array([self._state_to_regime.get(s, s) for s in raw_states])
         return pd.Series(regimes, index=df.index, name="hmm_regime", dtype=int)
 
-    def predict_proba(self, df: pd.DataFrame) -> pd.DataFrame:
+    def predict_proba(self, df: pd.DataFrame, causal: bool = True) -> pd.DataFrame:
         """
-        Predict posterior state probabilities for each bar.
+        Predict state probabilities for each bar: filtered (only bars up to each bar)
+        by default, smoothed over the whole sequence with causal=False.
 
         Returns
         -------
@@ -187,7 +213,7 @@ class HMMRegimeDetector:
         """
         self._check_fitted()
         X, _ = self._prepare(df)
-        _, posteriors = self.model.score_samples(X)
+        posteriors = self._filtered_posteriors(X) if causal else self.model.score_samples(X)[1]
 
         # Reorder columns to canonical regime order
         cols = {

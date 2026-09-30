@@ -161,11 +161,11 @@ class RegimeDetectionAgent:
         # ── Step 2: Generate HMM pseudo-labels for Transformer ────────────────
         if self.use_transformer:
             logger.info("Step 2/3: Generating HMM pseudo-labels...")
-            hmm_labels = self.hmm.predict(train_df)
+            hmm_labels = self.hmm.predict(train_df, causal=False)   # labels for past data: hindsight is fine
 
             val_labels = None
             if val_df is not None:
-                val_labels = self.hmm.predict(val_df)
+                val_labels = self.hmm.predict(val_df, causal=False)
 
             # ── Step 3: Fit Transformer ───────────────────────────────────────
             logger.info("Step 3/3: Training Transformer classifier...")
