@@ -73,6 +73,16 @@ export default function StrategyLab() {
           </p>
         </div>
 
+        <aside className={styles.notice} role="note" aria-label="Results being re-run">
+          <p>
+            <strong>MAESTRO&rsquo;s results are being re-run.</strong> On 30 September 2026 two look-ahead
+            bugs were found and fixed: macro data reached the models before it was published, and
+            MAESTRO&rsquo;s market-regime labels used later prices. The MAESTRO results here come from before
+            the fixes, so don&rsquo;t rely on them. The other strategies use prices only and are unaffected.
+            Corrected results over 20 years will replace this section.
+          </p>
+        </aside>
+
         <div className={`panel panel-glow ${styles.lab}`}>
           <fieldset className={styles.picker}>
             <legend className="eyebrow">Strategy</legend>

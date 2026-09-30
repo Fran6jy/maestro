@@ -511,3 +511,24 @@
     grid-row: 2;
   }
 }
+
+/* Temporary notice while MAESTRO's results are re-run after the look-ahead fixes. */
+.notice {
+  margin: 0 0 24px;
+  padding: 14px 18px;
+  border: 1px solid var(--line-2);
+  border-left: 3px solid var(--amber);
+  border-radius: 10px;
+  background: var(--amber-soft);
+}
+
+.notice p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+.notice strong {
+  color: var(--ink);
+}
