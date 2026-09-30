@@ -47,3 +47,12 @@ def test_filtering_agrees_with_smoothing_at_the_last_bar(fitted):
     test = df.iloc[2000:]
     np.testing.assert_allclose(hmm.predict_proba(test).iloc[-1].values,
                                hmm.predict_proba(test, causal=False).iloc[-1].values, atol=1e-8)
+
+
+def test_a_reloaded_regime_detector_votes_like_the_original(fitted, tmp_path):
+    from maestro.agents.regime.regime_classifier import RegimeDetectionAgent
+    hmm, df = fitted
+    agent = RegimeDetectionAgent(use_transformer=False)
+    agent.hmm, agent.fitted, agent.hmm_weight = hmm, True, 0.3        # a tuned weight
+    agent.save(tmp_path)
+    assert RegimeDetectionAgent.load(tmp_path).hmm_weight == 0.3

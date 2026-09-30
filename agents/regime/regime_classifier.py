@@ -31,6 +31,8 @@ Regime IDs (consistent across all agents)
 """
 from __future__ import annotations
 
+import json
+
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -356,6 +358,9 @@ class RegimeDetectionAgent:
         self.hmm.save(model_dir / "hmm_regime.pkl")
         if self.use_transformer and self.transformer.fitted:
             self.transformer.save(model_dir / "transformer_regime.pt")
+        # The HMM's share of the vote is tuned on validation data during fit(), so it has to
+        # travel with the model; otherwise a reloaded model votes differently.
+        (model_dir / "ensemble.json").write_text(json.dumps({"hmm_weight": self.hmm_weight}))
         logger.info("Agent 1 saved → %s", model_dir)
 
     @classmethod
@@ -371,7 +376,8 @@ class RegimeDetectionAgent:
             )
         else:
             agent.transformer = None
-        agent.hmm_weight  = 0.4
+        ensemble = model_dir / "ensemble.json"
+        agent.hmm_weight  = json.loads(ensemble.read_text())["hmm_weight"] if ensemble.exists() else 0.4
         agent.fitted      = True
         logger.info("Agent 1 loaded from %s", model_dir)
         return agent
