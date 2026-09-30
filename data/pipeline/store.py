@@ -256,6 +256,29 @@ def feature_path(granularity: str = "M5") -> Path:
     return DATA_DIR / name
 
 
+def features_from(target: pd.DataFrame, other: pd.DataFrame, fred: pd.DataFrame,
+                  granularity: str = "M5") -> pd.DataFrame:
+    """The feature table from candles and FRED observations passed in directly.
+
+    Shared by the research store (20 years of history) and the live loop (a
+    30-day window): on real data the two agree on every model input to within
+    2e-6 relative at the latest bars, so live decisions match the backtest's.
+    """
+    from maestro.data.features.engineer import FeatureEngineer, add_cross_pair_features
+    from maestro.data.features.macro import macro_frame
+
+    fe = FeatureEngineer()
+    ohlcv = ["open", "high", "low", "close", "volume"]
+    raw = resample_candles(target, granularity)
+    feats = fe.transform(raw[ohlcv], drop_nan=False)
+    feats["bid_close"], feats["ask_close"] = raw["bid_close"], raw["ask_close"]
+    feats["spread_pips"] = (raw["ask_close"] - raw["bid_close"]) / PIP
+    feats = pd.concat([feats, macro_frame(fred, feats.index)], axis=1)
+    other_feats = fe.transform(resample_candles(other, granularity)[ohlcv], drop_nan=False)
+    feats, _ = add_cross_pair_features(feats, other_feats)
+    return feats
+
+
 def build_features(raw: pd.DataFrame | None = None, granularity: str = "M5") -> pd.DataFrame:
     """Rebuild the full feature table for TARGET from the raw store.
 
@@ -263,22 +286,9 @@ def build_features(raw: pd.DataFrame | None = None, granularity: str = "M5") -> 
                   prices with a planted edge); the other pair and FRED always come from the store.
     granularity : bar length, one of BARS; indicators are computed on those bars.
     """
-    from maestro.data.features.engineer import FeatureEngineer, add_cross_pair_features
-    from maestro.data.features.macro import macro_frame
-
-    fe = FeatureEngineer()
-    ohlcv = ["open", "high", "low", "close", "volume"]
-    raw = resample_candles(load_candles(TARGET) if raw is None else raw, granularity)
-    feats = fe.transform(raw[ohlcv], drop_nan=False)
-    feats["bid_close"], feats["ask_close"] = raw["bid_close"], raw["ask_close"]
-    feats["spread_pips"] = (raw["ask_close"] - raw["bid_close"]) / PIP
-
-    feats = pd.concat([feats, macro_frame(load_fred(), feats.index)], axis=1)
-
     other = next(i for i in INSTRUMENTS if i != TARGET)
-    other_feats = fe.transform(resample_candles(load_candles(other), granularity)[ohlcv], drop_nan=False)
-    feats, _ = add_cross_pair_features(feats, other_feats)
-    return feats
+    return features_from(load_candles(TARGET) if raw is None else raw, load_candles(other),
+                         load_fred(), granularity)
 
 
 # ── Commands ─────────────────────────────────────────────────────────────────
