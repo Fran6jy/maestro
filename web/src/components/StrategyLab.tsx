@@ -67,7 +67,6 @@ export default function StrategyLab() {
     <section id="lab" className="band" aria-labelledby="lab-title">
       <div className="shell">
         <div className="band-head">
-          <p className="eyebrow">Strategy Lab</p>
           <h2 id="lab-title">Drag the cost. Watch the money.</h2>
           <p className="lede">
             Every strategy below traded EUR/USD for {RESULTS.months.length} months ({YEARS} years), each
@@ -153,7 +152,7 @@ export default function StrategyLab() {
 
             <div className={styles.headline} aria-live="polite">
               <p className={styles.headLead}>£10,000 traded with {s.label}, {PERIOD}</p>
-              <p className={`num ${styles.big} ${s.trades === 0 ? styles.idle : up ? styles.gain : styles.cool}`}>{gbp(shown)}</p>
+              <p className={`${styles.big} ${s.trades === 0 ? styles.idle : up ? styles.gain : styles.cool}`}>{gbp(shown)}</p>
               <p className={styles.headSub}>
                 at {cost.toFixed(2)} pips per trade · <span className={styles.amberText}>{gbp(endNo)}</span> with no costs
               </p>

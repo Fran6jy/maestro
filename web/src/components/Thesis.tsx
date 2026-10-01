@@ -25,7 +25,6 @@ export default function Thesis() {
   return (
     <section className="band" aria-labelledby="thesis-title">
       <div className="shell">
-        <p className="eyebrow">The research question</p>
         <blockquote className={`reveal ${styles.quote}`} id="thesis-title">
           My MSc asked the right questions but couldn&rsquo;t answer them rigorously. This PhD rebuilds
           the same strategies under a leakage-free, cost-aware test, shows what they{" "}

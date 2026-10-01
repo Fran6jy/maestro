@@ -112,11 +112,9 @@ button {
 }
 
 .eyebrow {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: var(--fs-xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--ink-2);
 }
 
 .shell {
@@ -213,19 +211,9 @@ button {
   height: 24px;
   padding-inline: 10px;
   border-radius: 999px;
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 0.6875rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: var(--fs-xs);
+  font-weight: 500;
   white-space: nowrap;
-}
-
-.pill::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
 }
 
 .pill-done {

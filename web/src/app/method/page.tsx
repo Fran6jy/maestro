@@ -66,7 +66,6 @@ export default function MethodPage() {
   return (
     <div className={`shell ${styles.page}`}>
       <header className={styles.head}>
-        <p className="eyebrow">Methodology</p>
         <h1>How it was tested</h1>
         <p className="lede">
           Every number on this site comes from one piece of scoring code, run the same way for every

@@ -35,9 +35,8 @@ export default async function Image() {
             <polyline key={i} points={r.pts} fill="none" stroke={r.stroke} strokeWidth={1.6} />
           ))}
         </svg>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 22, letterSpacing: 4, color: "#a3adba" }}>
-          <div style={{ width: 12, height: 12, borderRadius: 6, background: "#ffb547" }} />
-          MAESTRO · PHD RESEARCH · EUR/USD
+        <div style={{ display: "flex", alignItems: "center", fontSize: 26, color: "#a3adba" }}>
+          MAESTRO · PhD research on EUR/USD trading
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: 36, fontSize: 96, fontWeight: 700, lineHeight: 0.95, letterSpacing: -3 }}>
           <span>The cost of</span>

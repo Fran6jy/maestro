@@ -25,10 +25,6 @@ export default function Hero() {
       </div>
 
       <div className={`shell ${styles.content}`}>
-        <p className={`eyebrow ${styles.kicker}`}>
-          <span className={styles.dot} aria-hidden="true" />
-          MAESTRO · PhD research · EUR/USD
-        </p>
         <h1 id="hero-title" className={styles.title}>
           The cost of <em>being right.</em>
         </h1>

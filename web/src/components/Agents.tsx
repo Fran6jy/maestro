@@ -91,7 +91,6 @@ export default function Agents() {
     <section id="agents" className="band" aria-labelledby="agents-title">
       <div className="shell">
         <div className="band-head">
-          <p className="eyebrow">Inside MAESTRO</p>
           <h2 id="agents-title">Six specialists, one desk.</h2>
           <p className="lede">
             A single model has to be good at everything. MAESTRO splits the job the way a trading desk

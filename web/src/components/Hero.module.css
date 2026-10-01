@@ -65,21 +65,6 @@
   pointer-events: auto;
 }
 
-.kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--ink-2);
-}
-
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--amber);
-  box-shadow: 0 0 0 4px var(--amber-soft);
-}
-
 .title {
   font-size: var(--fs-hero);
   font-stretch: 76%;

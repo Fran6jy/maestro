@@ -140,7 +140,6 @@ function NotStarted() {
   return (
     <div className={`shell ${styles.page}`}>
       <header className={styles.head}>
-        <p className="eyebrow">Live trial</p>
         <h1>Starting soon</h1>
         <p className="lede">
           Every strategy will trade the euro against the dollar with £10,000 of pretend money at live
@@ -179,8 +178,7 @@ export default async function LivePage() {
       <header className={styles.hero}>
         <div className={styles.heroText}>
           <div className={styles.headTop}>
-            <p className="eyebrow">Live trial</p>
-            <span className={`pill ${snap.phase === "trial" ? "pill-done" : "pill-next"}`}>
+                <span className={`pill ${snap.phase === "trial" ? "pill-done" : "pill-next"}`}>
               {snap.phase === "trial" ? "Running" : "Shakedown"}
             </span>
           </div>

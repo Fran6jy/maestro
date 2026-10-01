@@ -38,7 +38,6 @@ export default function Roadmap() {
     <section id="roadmap" className="band" aria-labelledby="roadmap-title">
       <div className="shell">
         <div className="band-head">
-          <p className="eyebrow">Roadmap</p>
           <h2 id="roadmap-title">Where the research is now.</h2>
           <p className="lede">
             A clear &ldquo;no&rdquo; is a valid result. Each step is only reported once it has passed the

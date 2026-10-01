@@ -97,7 +97,6 @@ export default function MscReplay() {
     <section id="msc" className="band" aria-labelledby="msc-title">
       <div className={`shell ${styles.grid}`}>
         <div className={styles.copy}>
-          <p className="eyebrow">The MSc, re-examined</p>
           <h2 id="msc-title">My MSc reported a 37.6% hit rate. It doesn&rsquo;t hold up.</h2>
           <p className="lede">
             That number came from <strong>one month</strong> of 5-minute prices, and the model was scored

@@ -49,12 +49,11 @@ export default async function Image() {
             {live.length > 0 && <polyline points={path} fill="none" stroke="#ffb547" strokeWidth={4} />}
           </svg>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 22, letterSpacing: 4, color: "#a3adba" }}>
-          <div style={{ width: 12, height: 12, borderRadius: 6, background: "#ffb547" }} />
-          {ready ? `MAESTRO · LIVE TRIAL · DAY ${n}` : "MAESTRO · LIVE TRIAL"}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, fontSize: 26, color: "#a3adba" }}>
+          {ready ? `MAESTRO live trial · Day ${n}` : "MAESTRO live trial"}
           {snap?.phase === "shakedown" && (
-            <div style={{ display: "flex", marginLeft: 8, padding: "4px 14px", borderRadius: 999, fontSize: 18,
-              color: "#ffb547", background: "rgba(255,181,71,0.14)" }}>SHAKEDOWN</div>
+            <div style={{ display: "flex", marginLeft: 8, padding: "4px 14px", borderRadius: 999, fontSize: 20,
+              color: "#ffb547", background: "rgba(255,181,71,0.14)" }}>Shakedown</div>
           )}
         </div>
         <div style={{ display: "flex", marginTop: 26, fontSize: 64, fontWeight: 700, letterSpacing: -2, lineHeight: 1 }}>

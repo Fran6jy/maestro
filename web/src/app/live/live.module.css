@@ -404,10 +404,8 @@
   padding-inline: 14px 16px;
   border: 1px solid var(--line-2);
   border-radius: 999px;
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: var(--fs-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: var(--fs-sm);
+  font-weight: 500;
   color: var(--amber);
   transition: border-color 0.2s ease, background 0.2s ease;
 }

@@ -96,9 +96,8 @@
 
 .nodeName {
   font-family: var(--font-mono), monospace;
-  font-size: 0.6875rem;
-  letter-spacing: 0.04em;
-  color: var(--ink-3);
+  font-size: 0.75rem;
+  color: var(--ink-2);
 }
 
 .detail {
