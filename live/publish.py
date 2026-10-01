@@ -39,7 +39,9 @@ def git(work: Path, *args: str, key: Path) -> str:
            "GIT_SSH_COMMAND": f"ssh -i {key} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new",
            "GIT_AUTHOR_NAME": AUTHOR[0], "GIT_AUTHOR_EMAIL": AUTHOR[1],
            "GIT_COMMITTER_NAME": AUTHOR[0], "GIT_COMMITTER_EMAIL": AUTHOR[1]}
-    out = subprocess.run(["git", "-C", str(work), *args], env=env, capture_output=True, text=True, timeout=120)
+    # The working copy is a host folder owned by the VM's user; the container runs as root.
+    out = subprocess.run(["git", "-c", f"safe.directory={work}", "-C", str(work), *args],
+                         env=env, capture_output=True, text=True, timeout=120)
     if out.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)}: {out.stderr.strip()[:500]}")
     return out.stdout
