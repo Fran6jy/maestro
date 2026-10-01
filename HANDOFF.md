@@ -66,9 +66,13 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
 
 ## What is next
 
-1. Horizon sweep (`--granularity H1|H4|D`, daily `--expanding`), running on the laptop since
-   1 Oct 2026, log `C:\tmp\maestro_outputs\maestro\horizon_sweep_causal.log`; score each with
-   `--score-only`.
+1. ~~Horizon sweep~~ done 1 Oct 2026 (`H1_refit3_roll12_fast`, `H4_refit3_roll12_fast`,
+   `D_refit3_expanding_fast`; risk layer on H1 too). Slower bars don't rescue MAESTRO. The one
+   positive MAESTRO result anywhere, hourly top 10% (+0.36 pips/trade after 0.8 pips, Sharpe +0.14,
+   121/243 months), is noise: t = 0.69 on daily returns, 12 of 21 years positive, 2009 alone is more
+   than all of its profit, negative at 1.5 pips, and it is the best of many variants tried. On 4-hour
+   and daily bars MAESTRO is below 50% hit and loses; only the moving-average crossover is faintly
+   positive (Sharpe 0.25 and 0.22, also not significant). The hourly cost filter loses (−0.11).
 2. The monthly-retraining comparison (`--refit-months 1`, on Kaggle).
 3. Freeze the design; run the sealed holdout once (`--holdout`).
 4. Regenerate the live expectations from the frozen design and commit them *before* the trial
