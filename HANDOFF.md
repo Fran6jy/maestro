@@ -22,18 +22,30 @@ If a task doesn't serve it, it is future work.
 | Holdout | Everything from 7 Mar 2026 is sealed; `--holdout` opens it once, for the frozen design | `data/holdout.py` |
 | Baselines, 20 years | Small real edge (52–53% hit, +0.1–0.7 pips/trade before costs); none beats costs | README table |
 | Regime look-ahead fixed | HMM regimes now forward-filtered; all MAESTRO results before the fix are invalid and being re-run | `agents/regime/hmm_regime.py` |
-| Live trial | Built and in paper-only shakedown on a private always-on server | `live/`, `deploy/live/` |
-| Tests | 82 passing: look-ahead, data timing, causal regimes, store, runner, live parity, practice-only client | `tests/` |
+| Live trial | Built and in paper-only shakedown on a private always-on server; nightly public snapshot, health check and a hidden live page built | `live/`, `deploy/live/`, `web/src/app/live/` |
+| Tests | 86 passing: look-ahead, data timing, causal regimes, store, runner, live parity, live snapshot, practice-only client | `tests/` |
 | Public website | Live; MAESTRO section flagged as being re-run | [maestro-research.vercel.app](https://maestro-research.vercel.app), `web/` |
 
-## MAESTRO: being re-run
+## MAESTRO: re-run after the regime fix
 
 Every MAESTRO number produced before commit `5a9f47b` used regimes that saw later bars (the HMM's
-Viterbi path and forward-backward smoothing over whole three-month test blocks). That includes the
-20-year result (53% hit, an edge that faded after 2020), the power test and the risk-layer tests.
-Those outputs are kept for the record in `C:\tmp\maestro_outputs\_leaky_regime\` and must not be
-cited. The re-run of the 20-year quarterly design (`refit3_roll12_fast`) is split between the laptop
-(forward) and Kaggle (backward).
+Viterbi path and forward-backward smoothing over whole three-month test blocks). Those outputs are
+kept for the record in `C:\tmp\maestro_outputs\_leaky_regime\` and must not be cited.
+
+The 20-year quarterly design (`refit3_roll12_fast`, 81 blocks, laptop forward + Kaggle backward) was
+re-run on 1 Oct 2026. The leak made almost no difference. At 0.8 pips:
+
+| Variant | Hit | Pips/trade before costs | Sharpe after costs | Months profitable |
+|---|---:|---:|---:|---:|
+| MAESTRO, every signal | 52.7% | 0.28 | −2.51 | 51/243 |
+| MAESTRO, top 10% confidence | 53.1% | 0.23 | −2.50 | 54/243 |
+| MAESTRO + cost filter (`risk_cost_filter`) | 53.9% | 0.30 | −0.89 | 74/243 |
+| MAESTRO as designed (`maestro_gated`) | 1 trade in 20 years | | | |
+| Bollinger bands (best baseline) | 52.6% | 0.70 | −0.30 | 101/243 |
+
+MAESTRO is the most accurate forecaster tested but earns a third of the cost per trade; no variant
+beats Bollinger after costs. The leak had flattered the cost filter (Sharpe −0.54 → −0.89). The
+power test is being re-run; the site still shows MAESTRO as withdrawn until it passes.
 
 Bugs found and fixed so far (they belong in the thesis methods chapter):
 
@@ -51,14 +63,16 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
 
 ## What is next
 
-1. Finish the causal 20-year re-run; collect Kaggle's blocks (`cloud.kaggle.collect`), score it.
-2. Re-run the power test and the risk layer on the fixed code; then the monthly-retraining
-   comparison and the horizon sweep (`--granularity H1|H4|D`).
+1. Finish the power test re-run (`power_test --fast`); if MAESTRO finds the planted edge, put its
+   corrected results on the website and in the README.
+2. The monthly-retraining comparison and the horizon sweep (`--granularity H1|H4|D`).
 3. Freeze the design; run the sealed holdout once (`--holdout`).
-4. Choose the MAESTRO variant that trades on the practice account; train the live model
-   (`live.deploy`), copy it to the server, restart with `--orders <variant>`. The 4–8 week trial
-   starts then. Build the daily live-vs-backtest reconciliation during the shakedown.
-5. Update the website and README with the corrected results.
+4. Regenerate the live expectations from the frozen design and commit them *before* the trial
+   (`python -m maestro.live.expectations`): they are the trial's published prediction.
+5. Choose the MAESTRO variant that trades on the practice account; train the live model
+   (`live.deploy`), copy it to the server, restart with `--orders <variant>` and
+   `MAESTRO_LIVE_PHASE=trial`. The 4–8 week trial starts then; go public as in
+   `deploy/live/README.md`.
 
 ## Live trial
 
@@ -69,7 +83,14 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
   No practice orders are sent until a variant is chosen and confirmed.
 - Update the model: `python -m maestro.live.deploy --out <dir>` on the laptop, copy the folder to
   `state/models/`, point `state/models/current` at it, then `docker compose restart`.
-- Watch: `cat state/status.json` (last bar, targets, any error) or `docker compose logs -f`.
+- Watch: `docker exec maestro-live python -m maestro.live.report` (health, every strategy in pips,
+  practice fills), `cat state/status.json` or `docker compose logs -f`.
+- Nightly snapshot: `maestro-publish` pushes `live/snapshot.py`'s output to the `maestro-live`
+  repository at 00:20 UTC; that repository's Action runs `live/check.py` and emails on failure.
+  The live page (`web/src/app/live/`) reads it and stays a 404 until `LIVE_PUBLIC=1` on Vercel.
+  Preview it locally with `LIVE_SNAPSHOT_FILE=<snapshot.json>` in `web/.env.local` and `npm run dev`.
+- Live quoted spreads in the shakedown average about 0.8 pips, well under the 1.5-pip median of the
+  candles' bid/ask since 2022; worth explaining in the thesis (quote source and timing differ).
 - Each cycle re-filters regimes from the model's start date; if cycles slow down as that history
   grows, make the filter incremental.
 

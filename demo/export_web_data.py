@@ -88,8 +88,8 @@ MAESTRO_TEXT = {
     "maestro_ungated": ("MAESTRO, every signal", "maestro",
                         "The same forecasts with no confidence filter, so it acts on every up or down call."),
     "maestro_gated":   ("MAESTRO as designed", "maestro",
-                        "Trades only when confidence clears the thresholds it was designed with. In 39 months "
-                        "it never did, so it never traded."),
+                        "Trades only when confidence clears the thresholds it was designed with. Over 20 "
+                        "years that happened once."),
 }
 
 

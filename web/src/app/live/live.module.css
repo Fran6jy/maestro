@@ -1,0 +1,413 @@
+.page {
+  padding-top: calc(150px + env(safe-area-inset-top, 0px));
+  padding-bottom: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(64px, 9vw, 112px);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 48rem;
+}
+
+.headTop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.head h1 {
+  font-size: var(--fs-2xl);
+  font-stretch: 78%;
+  line-height: 1;
+}
+
+.notice {
+  padding: 16px 20px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  max-width: 44rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 46rem;
+}
+
+.sectionHead h2 {
+  font-size: var(--fs-xl);
+  font-stretch: 84%;
+}
+
+.gain {
+  color: var(--gain);
+}
+
+.loss {
+  color: var(--loss);
+}
+
+.small {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
+/* ── Balance cards ─────────────────────────────────────── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cardLabel {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.cardValue {
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.cardMeta {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
+/* ── Range charts ──────────────────────────────────────── */
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 14px;
+}
+
+.chartCard {
+  margin: 0;
+  padding: 18px 18px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chartCard figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.chartName {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.chartCard svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.bandOuter {
+  fill: var(--cool-soft);
+}
+
+.bandInner {
+  fill: rgba(141, 180, 255, 0.22);
+}
+
+.median {
+  fill: none;
+  stroke: var(--cool);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.7;
+}
+
+.zero {
+  stroke: var(--line-2);
+  stroke-width: 1;
+}
+
+.tick {
+  fill: var(--ink-3);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+}
+
+.livePath {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 2.25;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.liveDot {
+  fill: var(--amber);
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+.chartNote {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
+.legend > span {
+  white-space: nowrap;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
+.keyOuter,
+.keyInner,
+.keyLive {
+  display: inline-block;
+  width: 18px;
+  height: 10px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.keyOuter {
+  background: var(--cool-soft);
+}
+
+.keyInner {
+  background: rgba(141, 180, 255, 0.22);
+}
+
+.keyLive {
+  height: 3px;
+  background: var(--amber);
+}
+
+/* ── Won vs fees ───────────────────────────────────────── */
+.splits {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.splitLabel {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.splitCol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.splitBar {
+  overflow: hidden;
+  display: flex;
+  gap: 3px;
+  height: 14px;
+  min-width: 0;
+}
+
+.splitBar span {
+  border-radius: 4px;
+  min-width: 3px;
+  flex-shrink: 0;
+}
+
+.splitText {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
+.lostText {
+  color: var(--amber);
+}
+
+.feeText {
+  color: var(--cost);
+}
+
+.won {
+  background: var(--gain);
+  opacity: 0.75;
+}
+
+.lost {
+  background: var(--amber);
+  opacity: 0.75;
+}
+
+.fees {
+  background: var(--cost);
+  opacity: 0.75;
+}
+
+/* ── Trade log ─────────────────────────────────────────── */
+.log {
+  list-style: none;
+  margin: 0;
+  padding: 8px 22px;
+  max-width: 46rem;
+}
+
+.log li {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 14px;
+  padding: 12px 0;
+  color: var(--ink-2);
+}
+
+.log li + li {
+  border-top: 1px solid var(--line);
+}
+
+.time {
+  color: var(--ink-3);
+}
+
+/* ── Facts ─────────────────────────────────────────────── */
+.facts {
+  list-style: none;
+  margin: 0;
+  padding: 8px 22px;
+  max-width: 46rem;
+}
+
+.facts li {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 0;
+  font-size: var(--fs-sm);
+}
+
+.facts li + li {
+  border-top: 1px solid var(--line);
+}
+
+.facts li > span:first-child {
+  color: var(--ink-3);
+}
+
+.facts a {
+  color: var(--amber);
+  text-decoration: none;
+  text-align: right;
+}
+
+.facts a:hover {
+  text-decoration: underline;
+}
+
+/* ── Show the numbers ──────────────────────────────────── */
+.more {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.more summary {
+  cursor: pointer;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber);
+  width: fit-content;
+}
+
+.moreBody {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  max-width: 60rem;
+}
+
+.moreBody a {
+  color: var(--amber);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--fs-sm);
+}
+
+.table th,
+.table td {
+  padding: 8px 12px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.table th:first-child,
+.table td:first-child {
+  text-align: left;
+  padding-left: 0;
+}
+
+.table th {
+  font-weight: 500;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+
+@media (max-width: 640px) {
+  .split {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .facts li {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .facts a {
+    text-align: left;
+  }
+}

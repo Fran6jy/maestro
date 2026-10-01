@@ -129,7 +129,7 @@ class LiveTrial:
     def write_status(self, result: dict | None, error: str | None = None) -> None:
         status = {"at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "error": error,
                   "last_cycle": result, "model": self.model.meta.get("deployed_at"),
-                  "order_strategy": self.order_strategy}
+                  "order_strategy": self.order_strategy, "order_units": self.order_units}
         (self.state / "status.json").write_text(json.dumps(status, indent=2, default=str))
 
     def run(self, once: bool = False) -> None:

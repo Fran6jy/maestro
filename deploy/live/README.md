@@ -33,4 +33,38 @@ docker compose down                 # stop
 
 The first start fetches 13 months of candles from OANDA and FRED's history, then
 handles each bar about 10 seconds after it closes. A restart never repeats a bar
-or an order. (Still to come: a daily reconciliation of the journal against the backtest.)
+or an order.
+
+## Check on it
+
+```bash
+docker exec maestro-live python -m maestro.live.report     # health, every strategy in pips, orders
+```
+
+## Nightly snapshot
+
+`maestro-publish` builds a snapshot from the journal at 00:20 UTC (`live/snapshot.py`:
+daily returns, pips, trades, practice fills against paper, bars recorded against bars
+the market was open; never prices) and pushes it to the `Fran6jy/maestro-live`
+repository as `snapshot.json` plus `history/<date>.json`. The website's live page
+reads `snapshot.json`; a GitHub Action in that repository runs `live/check.py` after
+every snapshot and every night, and fails (so GitHub emails the owner) if the
+snapshot is stale, the loop stopped or errored, or bars were missed.
+
+Once:
+
+1. Create the `maestro-live` repository (private during the shakedown) and copy in
+   the files from `snapshot-repo/` here.
+2. On the VM, make a key that only this service uses:
+   `ssh-keygen -t ed25519 -N "" -C maestro-publish -f ~/maestro-live/keys/maestro_live`
+3. Add `keys/maestro_live.pub` to the repository as a deploy key with write access.
+4. `docker compose up -d --build` starts both services.
+
+## Going public (when the trial proper starts)
+
+1. Regenerate the expectations from the frozen design, commit and push them *before*
+   the trial starts: `python -m maestro.live.expectations`.
+2. Deploy the trial's model and restart with `--orders <variant>` and
+   `MAESTRO_LIVE_PHASE=trial`.
+3. Make `maestro-live` public, set `LIVE_PUBLIC=1` on Vercel, add the Live link to
+   the site's navigation and redeploy.

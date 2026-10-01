@@ -3,6 +3,8 @@
 #   ./state/journal.db       forecasts, decisions, paper ledger, practice orders
 #   ./state/status.json      heartbeat, rewritten after every bar
 #   ./state/live.log         log
+#   ./publish                working copy of the snapshot repository (maestro-publish)
+#   ./keys/maestro_live      deploy key for the snapshot repository (never commit)
 # Secrets come from ./.env, which you create on the VM and never commit:
 #   OANDA_API_KEY=...   OANDA_ACCOUNT_ID=...   FRED_API_KEY=...
 services:
@@ -11,6 +13,7 @@ services:
       context: .
       args:
         COMMIT: ${MAESTRO_COMMIT:-main}
+    image: maestro-live:local
     container_name: maestro-live
     restart: unless-stopped
     env_file: .env
@@ -28,3 +31,28 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Publishes the nightly snapshot (live/snapshot.py) to the snapshot repository at
+  # 00:20 UTC. Reads the journal read-only; its one secret is ./keys/maestro_live, a
+  # deploy key that can write to that repository and nothing else.
+  maestro-publish:
+    image: maestro-live:local
+    container_name: maestro-publish
+    restart: unless-stopped
+    depends_on: [maestro-live]
+    environment:
+      MAESTRO_LIVE_PHASE: ${MAESTRO_LIVE_PHASE:-shakedown}
+    volumes:
+      - ./state:/state
+      - ./publish:/publish
+      - ./keys:/keys:ro
+    entrypoint: ["python", "-m", "maestro.live.publish"]
+    command: ["--repo", "git@github.com:Fran6jy/maestro-live.git", "--key", "/keys/maestro_live",
+              "--work", "/publish"]
+    mem_limit: 1g
+    cpus: 0.5
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"

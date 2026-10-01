@@ -69,6 +69,10 @@ backtest. It runs in one Docker container on a small always-on server (`deploy/l
   to each bar, gives the backtest's forecast on 40 of 40 test bars, and every strategy's live rule
   is tested bar for bar against the backtest's.
 - `live/oanda.py` can only reach OANDA's practice server and never resends an order.
+- Before the trial starts, the 20-year backtest's expected range for every strategy over 1–65 days
+  is committed (`web/src/data/live_expectations.json`); the live results are judged against it.
+- Every night a snapshot (returns, pips, fills, health; no prices) is published to a public
+  record, checked automatically, and shown on the site's live page.
 
 Status: paper-only shakedown since 30 September 2026. The trial proper starts once the corrected
 MAESTRO results fix which variant trades and the holdout confirmation has run.

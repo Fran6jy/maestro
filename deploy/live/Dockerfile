@@ -2,7 +2,7 @@
 # (laptop or Kaggle GPU) and copied into ./state/models/current.
 FROM python:3.11-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends git \
+RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # CPU build of PyTorch (has arm64 wheels, so it runs on an Oracle Ampere box).
