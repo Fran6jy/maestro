@@ -66,5 +66,6 @@ Once:
    the trial starts: `python -m maestro.live.expectations`.
 2. Deploy the trial's model and restart with `--orders <variant>` and
    `MAESTRO_LIVE_PHASE=trial`.
-3. Make `maestro-live` public, set `LIVE_PUBLIC=1` on Vercel, add the Live link to
-   the site's navigation and redeploy.
+3. Set `LIVE_INDEX=1` on Vercel (the page has been public but unlisted since the
+   shakedown: `maestro-live` public, `LIVE_PUBLIC=1`), add the Live link to the site's
+   navigation and redeploy.

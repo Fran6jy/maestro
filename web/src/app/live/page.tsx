@@ -20,7 +20,8 @@ export const metadata: Metadata = {
   title: "Live trial",
   description:
     "Every strategy trading EUR/USD with £10,000 of pretend money at live prices, against what 20 years of history said would happen.",
-  robots: { index: LIVE_PUBLIC, follow: LIVE_PUBLIC },
+  // Unlisted during the shakedown; LIVE_INDEX=1 lets search engines in once the trial proper starts.
+  robots: { index: process.env.LIVE_INDEX === "1", follow: process.env.LIVE_INDEX === "1" },
 };
 
 const REPO = "https://github.com/Fran6jy/maestro";
@@ -168,8 +169,8 @@ export default async function LivePage() {
         </p>
         {snap.phase === "shakedown" && (
           <p className={`panel ${styles.notice}`}>
-            This is a shakedown: the setup is being tested, and MAESTRO&rsquo;s models are still being
-            retrained after a bug fix. These numbers are not results yet.
+            This is a shakedown: the setup is being tested before the trial proper, which starts after
+            a final test on data no model has seen. These numbers are not results yet.
           </p>
         )}
       </header>
