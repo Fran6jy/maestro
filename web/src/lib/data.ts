@@ -6,6 +6,7 @@ export type StrategyKey =
   | "maestro_top10"
   | "maestro_ungated"
   | "maestro_gated"
+  | "risk_cost_filter"
   | "logreg_lag5"
   | "bollinger_20_2"
   | "contrarian_3"

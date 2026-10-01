@@ -17,14 +17,14 @@ const ITEMS = [
     body: "Over 20 years the models that learn from past moves call the next move right about 52% of the time, a real edge, but it earns under a pip per trade. Every strategy loses money after costs.",
   },
   {
-    status: ["pill-next", "Re-running"],
+    status: ["pill-done", "Done"],
     title: "MAESTRO vs the baselines",
-    body: "Same months, costs and scoring code. Being re-run after a bug let MAESTRO's regime labels see later prices; earlier MAESTRO results are withdrawn.",
+    body: "Same months, costs and scoring code. MAESTRO calls 53–54% of moves right, the best of any strategy, but earns about a third of a trade's cost, so it loses money too. Re-run after a look-ahead bug fix, which barely changed it.",
   },
   {
     status: ["pill-next", "Shakedown"],
     title: "Live practice trial",
-    body: "MAESTRO and the MSc strategies trade side by side on every 5-minute bar, paper-traded at live OANDA prices, and one MAESTRO version will also place orders on a practice account. Running as a paper-only shakedown now; the trial proper starts once MAESTRO's results are corrected. No real money.",
+    body: "MAESTRO and the MSc strategies trade side by side on every 5-minute bar, paper-traded at live OANDA prices, and one MAESTRO version will also place orders on a practice account. Running as a paper-only shakedown now; the trial proper starts after a final test on data no model has seen. No real money.",
   },
   {
     status: ["pill-later", "Later"],

@@ -28,7 +28,8 @@ const GROUPS = [
 ].filter((g) => RESULTS.strategies.some((st) => st.group === g.id));
 const PERIOD = `${RESULTS.months[0].label} to ${RESULTS.months[RESULTS.months.length - 1].label}`;
 const YEARS = Math.round(RESULTS.months.length / 12);
-const FIRST: StrategyKey = STRATEGY.maestro_top10 ? "maestro_top10" : "logreg_lag5";
+const FIRST: StrategyKey = (["risk_cost_filter", "maestro_top10", "logreg_lag5"] as StrategyKey[])
+  .find((k) => STRATEGY[k]) ?? "logreg_lag5";
 
 export default function StrategyLab() {
   const [key, setKey] = useState<StrategyKey>(FIRST);
@@ -76,12 +77,12 @@ export default function StrategyLab() {
           </p>
         </div>
 
-        <aside className={styles.notice} role="note" aria-label="Results being re-run">
+        <aside className={styles.notice} role="note" aria-label="Correction">
           <p>
-            <strong>MAESTRO&rsquo;s results are being re-run.</strong> On 30 September 2026 two look-ahead
-            bugs were found and fixed: macro data reached the models before it was published, and
-            MAESTRO&rsquo;s market-regime labels used later prices. MAESTRO is left out of the Lab until its
-            corrected 20-year results are ready. The strategies shown use prices only and are unaffected.
+            <strong>Corrected on 1 October 2026.</strong> Two look-ahead bugs were found and fixed: macro
+            data reached the models before it was published, and MAESTRO&rsquo;s market-regime labels used
+            later prices. MAESTRO was re-run over all 20 years on the fixed code; the bugs barely changed
+            its results. The other strategies use prices only and were never affected.
           </p>
         </aside>
 

@@ -24,7 +24,7 @@ If a task doesn't serve it, it is future work.
 | Regime look-ahead fixed | HMM regimes now forward-filtered; all MAESTRO results before the fix are invalid and being re-run | `agents/regime/hmm_regime.py` |
 | Live trial | Built and in paper-only shakedown on a private always-on server; nightly public snapshot, health check and a hidden live page built | `live/`, `deploy/live/`, `web/src/app/live/` |
 | Tests | 86 passing: look-ahead, data timing, causal regimes, store, runner, live parity, live snapshot, practice-only client | `tests/` |
-| Public website | Live; MAESTRO section flagged as being re-run | [maestro-research.vercel.app](https://maestro-research.vercel.app), `web/` |
+| Public website | Live; MAESTRO's corrected 20-year results in the Strategy Lab (cost-check version included) | [maestro-research.vercel.app](https://maestro-research.vercel.app), `web/` |
 
 ## MAESTRO: re-run after the regime fix
 
@@ -45,7 +45,10 @@ re-run on 1 Oct 2026. The leak made almost no difference. At 0.8 pips:
 
 MAESTRO is the most accurate forecaster tested but earns a third of the cost per trade; no variant
 beats Bollinger after costs. The leak had flattered the cost filter (Sharpe −0.54 → −0.89). The
-power test is being re-run; the site still shows MAESTRO as withdrawn until it passes.
+power test (`power_test --fast`, 4 blocks of 2024-25 per level) passes on the fixed code: with no
+planted edge MAESTRO's top 10% hit 53.1%; at a planted 52% it found nothing (50.1%); at a planted 55%
+it found it (top 10% 58.4%, every signal 56.1%) and made money after costs (Sharpe 7.0 and 7.8).
+So a moderate edge would be found; MAESTRO's real-data losses are not a pipeline failure.
 
 Bugs found and fixed so far (they belong in the thesis methods chapter):
 
@@ -63,9 +66,10 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
 
 ## What is next
 
-1. Finish the power test re-run (`power_test --fast`); if MAESTRO finds the planted edge, put its
-   corrected results on the website and in the README.
-2. The monthly-retraining comparison and the horizon sweep (`--granularity H1|H4|D`).
+1. Horizon sweep (`--granularity H1|H4|D`, daily `--expanding`), running on the laptop since
+   1 Oct 2026, log `C:\tmp\maestro_outputs\maestro\horizon_sweep_causal.log`; score each with
+   `--score-only`.
+2. The monthly-retraining comparison (`--refit-months 1`, on Kaggle).
 3. Freeze the design; run the sealed holdout once (`--holdout`).
 4. Regenerate the live expectations from the frozen design and commit them *before* the trial
    (`python -m maestro.live.expectations`): they are the trial's published prediction.

@@ -38,13 +38,6 @@ HORIZON = 65                       # about three months of trading days
 QUANTILES = (0.05, 0.25, 0.5, 0.75, 0.95)
 START = 10_000                     # the site's starting balance
 
-# Strategies the live loop trades that the main site's tables don't describe.
-LIVE_TEXT = {
-    "risk_cost_filter": ("MAESTRO with a cost check", "maestro",
-                         "MAESTRO's forecasts, but it trades only when the move it expects is worth "
-                         "more than the cost of trading plus half a pip."),
-}
-
 
 def ranges(daily: pd.Series) -> list[list[float]]:
     """Percentiles of the balance change over every run of n consecutive days, n = 1..HORIZON."""
@@ -69,7 +62,7 @@ def build(results: Path, risk: Path, instrument: str = "EUR_USD") -> dict:
     net = pooled[pooled["cost"] == "spread"].set_index("strategy")
     gross = pooled[pooled["cost"] == "gross"].set_index("strategy")
 
-    text = {**MAESTRO_TEXT, **STRATEGY_TEXT, **LIVE_TEXT}
+    text = {**MAESTRO_TEXT, **STRATEGY_TEXT}
     strategies = {}
     for key, (label, group, desc) in text.items():
         if f"{key}|spread" not in daily.columns:

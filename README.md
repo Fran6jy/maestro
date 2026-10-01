@@ -39,13 +39,27 @@ before costs), but it is worth only 0.1–0.7 pips per trade. OANDA's real EUR/U
 every bar, has a median of 0.9–1.6 pips depending on the year (1.5–1.6 since 2022). Buy and hold earns
 nothing over the full 20 years; its good showing in 2023–2026 was that period.
 
-**MAESTRO's results are being re-run.** Two look-ahead bugs were found and fixed on 30 September 2026:
-macro data reached the models before it was published, and MAESTRO's regime detector labelled each
-bar using the whole three-month test block it sat in (the HMM's Viterbi path and forward-backward
-smoothing), so a bar's regime depended on later prices. On real blocks that changed 1–5% of regime
-labels, concentrated at regime switches. Every MAESTRO number produced before the fix, including an
-apparent 53% hit rate that faded after 2020, the power test and the risk-layer tests, is being
-re-run on the fixed code. The baselines use prices only and are unaffected.
+**MAESTRO is the most accurate forecaster tested, and it still doesn't beat costs.** Same months,
+same costs, same scoring code:
+
+| MAESTRO version | Right about next move | Trades | Pips per trade before costs | Sharpe after costs | £10,000 becomes |
+|---|---:|---:|---:|---:|---:|
+| Every signal | 52.7% | 63,749 | +0.28 | −2.51 | £661 |
+| Most confident 10% | 53.1% | 39,112 | +0.23 | −2.50 | £1,569 |
+| With a cost check (risk agent) | 53.9% | 12,784 | +0.30 | −0.89 | £6,061 |
+| As designed (confidence thresholds) | 1 trade in 20 years | | | | £10,004 |
+
+Its best version calls 54% of moves right, more than any baseline, but earns about a third of a
+trade's cost and ends a little behind Bollinger bands (£6,474). A power test planted a known edge
+in real prices: at a 55% planted edge MAESTRO found it (58% of its most confident calls right) and
+made money after costs; at 52% it found nothing.
+
+**Corrected after two look-ahead bugs.** Found and fixed on 30 September 2026: macro data reached
+the models before it was published, and MAESTRO's regime detector labelled each bar using the whole
+three-month test block it sat in (the HMM's Viterbi path and forward-backward smoothing), so a bar's
+regime depended on later prices. Everything above was re-run on the fixed code; the fixes barely
+changed MAESTRO's results, and the baselines use prices only. The cost-check version was first tried
+after results from before the fix had been seen, so the sealed holdout is its real test.
 
 **How the evaluation is checked.**
 - Macro inputs (VIX, yields, rates, CPI) reach a bar only once they were public.
@@ -85,8 +99,9 @@ MAESTRO results fix which variant trades and the holdout confirmation has run.
 | Leakage-free, cost-aware evaluator with look-ahead tests | Done |
 | 20 years of data, daily ingestion, macro timing fixed, holdout sealed | Done |
 | MSc strategies scored over 20 years | Done: small real edge, nothing beats costs |
-| MAESTRO over 20 years, power test, risk layer | Re-running after the regime fix |
-| Monthly vs quarterly retraining, horizon sweep (1-hour, 4-hour, daily bars) | After the re-run |
+| MAESTRO over 20 years, power test, risk layer | Done (re-run after the regime fix): best hit rate, still loses after costs |
+| Horizon sweep (1-hour, 4-hour, daily bars) | Running |
+| Monthly vs quarterly retraining | Next |
 | Live trial on an OANDA **practice** account | Paper shakedown running |
 | Cross-asset extension (gold, S&P 500) | Later |
 

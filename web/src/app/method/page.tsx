@@ -147,8 +147,9 @@ export default function MethodPage() {
               been stamped at midnight on the day they describe, so each bar saw that day&rsquo;s closing
               VIX, and inflation six weeks before it was published. And MAESTRO&rsquo;s regime detector
               labelled each bar using the whole three-month test block around it, so a label could depend
-              on later prices. Both are fixed; MAESTRO&rsquo;s earlier results are withdrawn and being
-              re-run. The other strategies use prices only and were not affected.
+              on later prices. Both are fixed, and MAESTRO was re-run over all 20 years on the fixed code;
+              the fixes barely changed its results. The other strategies use prices only and were not
+              affected.
             </p>
             <p>
               See <a href={`${REPO}/tests`} target="_blank" rel="noreferrer">the tests</a>.
@@ -182,10 +183,14 @@ export default function MethodPage() {
             <p>
               MAESTRO forecasts the next 30 minutes with its regime, TFT and PatchTST agents, retrained
               on the same schedule, with two months of each training window held back to stop training
-              early. Its results are being re-run after the fixes above. How forecasts become trades is a design choice, so three versions
-              were fixed before any result was seen: <strong>as designed</strong> (trade only above the
-              confidence thresholds MAESTRO was built with), <strong>most confident 10%</strong> (the
-              cut-off taken from the previous five trading days), and <strong>every signal</strong>.
+              early. How forecasts become trades is a design choice, so three versions were fixed before
+              any result was seen: <strong>as designed</strong> (trade only above the confidence
+              thresholds MAESTRO was built with), <strong>most confident 10%</strong> (the cut-off taken
+              from the previous five trading days), and <strong>every signal</strong>. A fourth,{" "}
+              <strong>with a cost check</strong>, comes from MAESTRO&rsquo;s risk agent: it trades only when
+              the forecast move is worth more than the cost plus half a pip. It was first tried after
+              results from before the bug fixes had been seen, so it is less blind than the other three;
+              the sealed final test period is where that is settled.
             </p>
           </section>
 

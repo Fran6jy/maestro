@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "MAESTRO · The cost of being right",
     description:
-      "£10,000 on a simple trading model becomes £19,697 before costs and £188 after. PhD research on AI trading, tested honestly.",
+      "Over 20 years, £10,000 on a simple trading model becomes £22.9 million before costs and nothing after. PhD research on AI trading, tested honestly.",
     type: "website",
   },
   twitter: { card: "summary_large_image" },

@@ -16,8 +16,8 @@ const STEPS = [
   {
     n: "03",
     title: "Challenge",
-    body: "Put MAESTRO, a team of specialist AI agents, through exactly the same test. Its results are being re-run after two look-ahead bugs were found and fixed.",
-    status: { cls: "pill-next", label: "Re-running" },
+    body: "Put MAESTRO, a team of specialist AI agents, through exactly the same test. It calls more moves right than anything else, and still doesn't beat the costs.",
+    status: { cls: "pill-done", label: "Done" },
   },
 ];
 

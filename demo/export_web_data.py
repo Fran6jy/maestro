@@ -87,6 +87,9 @@ MAESTRO_TEXT = {
                         "with two deep-learning models, and trades only its 10% most confident calls."),
     "maestro_ungated": ("MAESTRO, every signal", "maestro",
                         "The same forecasts with no confidence filter, so it acts on every up or down call."),
+    "risk_cost_filter": ("MAESTRO with a cost check", "maestro",
+                         "MAESTRO's forecasts, but it trades only when the move it expects is worth "
+                         "more than the cost of trading plus half a pip."),
     "maestro_gated":   ("MAESTRO as designed", "maestro",
                         "Trades only when confidence clears the thresholds it was designed with. Over 20 "
                         "years that happened once."),
@@ -98,11 +101,24 @@ def _num(v: float, digits: int = 4) -> float | None:
     return None if pd.isna(v) else round(float(v), digits)
 
 
-def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
-    pooled = pd.read_csv(results / f"{instrument}_baselines_pooled.csv")
-    per_split = pd.read_csv(results / f"{instrument}_baselines_per_split.csv")
-    daily = pd.read_csv(results / f"{instrument}_baselines_daily.csv", index_col=0).fillna(0.0)
+def _read(folder: Path, instrument: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    pooled = pd.read_csv(folder / f"{instrument}_baselines_pooled.csv")
+    per_split = pd.read_csv(folder / f"{instrument}_baselines_per_split.csv")
+    daily = pd.read_csv(folder / f"{instrument}_baselines_daily.csv", index_col=0).fillna(0.0)
     daily.index = pd.to_datetime(daily.index, utc=True)
+    return pooled, per_split, daily
+
+
+def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
+    pooled, per_split, daily = _read(results, instrument)
+    risk = results.parent / "scores_risk"
+    if (risk / f"{instrument}_baselines_pooled.csv").exists():
+        # The risk layer's variants (backtesting/risk_layer.py) were scored on the same bars.
+        rp, rs, rd = _read(risk, instrument)
+        keep = lambda df: df[df["strategy"].str.startswith("risk_")]  # noqa: E731
+        pooled = pd.concat([pooled, keep(rp)])
+        per_split = pd.concat([per_split, keep(rs)])
+        daily = daily.join(rd[[c for c in rd.columns if c.startswith("risk_")]], how="left").fillna(0.0)
 
     gross_row = pooled[pooled["cost"] == "gross"].set_index("strategy")
     net_row = pooled[pooled["cost"] == "spread"].set_index("strategy")
@@ -164,8 +180,12 @@ def export_ridge(close: pd.Series, start: str, end: str) -> dict:
 
 
 def default_results() -> Path:
-    maestro = OUTPUT_DIR / "maestro" / DESIGN / "scores"
-    return maestro if (maestro / "EUR_USD_baselines_pooled.csv").exists() else OUTPUT_DIR / "baselines" / DESIGN
+    """MAESTRO's scored design (it includes every baseline), else the baselines alone."""
+    for tag in (DESIGN, f"{DESIGN}_fast"):
+        maestro = OUTPUT_DIR / "maestro" / tag / "scores"
+        if (maestro / "EUR_USD_baselines_pooled.csv").exists():
+            return maestro
+    return OUTPUT_DIR / "baselines" / DESIGN
 
 
 def main() -> None:
