@@ -188,7 +188,7 @@ export default async function LivePage() {
                 <p className={styles.cardLabel}>{label(k)}</p>
                 <p className={`num ${styles.cardValue}`}>{money(start + change, false)}</p>
                 <p className={`num ${change >= 0 ? styles.gain : styles.loss}`}>{money(change)} so far</p>
-                <p className={styles.cardMeta}>{s.trades.toLocaleString("en-GB")} trades · {PLACEMENT_TEXT[where].toLowerCase()}</p>
+                <p className={styles.cardMeta}>{s.trades.toLocaleString("en-GB")} {s.trades === 1 ? "trade" : "trades"} · {PLACEMENT_TEXT[where].toLowerCase()}</p>
               </div>
             );
           })}
