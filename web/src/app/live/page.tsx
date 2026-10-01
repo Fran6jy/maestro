@@ -22,6 +22,11 @@ export const metadata: Metadata = {
     "Every strategy trading EUR/USD with £10,000 of pretend money at live prices, against what 20 years of history said would happen.",
   // Unlisted during the shakedown; LIVE_INDEX=1 lets search engines in once the trial proper starts.
   robots: { index: process.env.LIVE_INDEX === "1", follow: process.env.LIVE_INDEX === "1" },
+  openGraph: {
+    title: "MAESTRO live trial",
+    description: "Every strategy trading EUR/USD with £10,000 of pretend money at live prices, against a forecast written before it started.",
+    type: "website",
+  },
 };
 
 const REPO = "https://github.com/Fran6jy/maestro";
@@ -66,14 +71,16 @@ const PLACEMENT_TEXT = {
 } as const;
 
 // ── The called shot: backtest range against the live path ─────────────────────
-function RangeChart({ snap, k, start }: { snap: Snapshot; k: string; start: number }) {
+function RangeChart({ snap, k, start, hero = false }: { snap: Snapshot; k: string; start: number; hero?: boolean }) {
   const exp = EXPECT.strategies[k];
   const live = balancePath(snap.strategies[k]?.daily.ref ?? [], start);
   if (!exp) return null;
   const n = live.length;
-  const span = Math.min(EXPECT.horizon_days, Math.max(20, n + 5));
+  // The axis grows with the trial, so the live line is always the widest thing in the chart.
+  const span = Math.min(EXPECT.horizon_days, Math.max(10, n + 5));
   const ranges = exp.ranges.slice(0, span);
-  const W = 460, H = 220, L = 70, R = 12, T = 14, B = 30;
+  const [W, H] = hero ? [600, 330] : [460, 220];
+  const L = hero ? 86 : 76, R = 12, T = 14, B = 30;
   const lo = Math.min(0, ...ranges.map((q) => q[0]), ...live);
   const hi = Math.max(0, ...ranges.map((q) => q[4]), ...live);
   const pad = (hi - lo) * 0.08 || 1;
@@ -89,27 +96,42 @@ function RangeChart({ snap, k, start }: { snap: Snapshot; k: string; start: numb
   const last = live[n - 1] ?? 0;
   const where = n ? placement(last, exp.ranges[Math.min(n, EXPECT.horizon_days) - 1]) : "middle";
   return (
-    <figure className={`panel ${styles.chartCard}`}>
+    <figure className={`panel ${hero ? `panel-glow ${styles.heroCard}` : ""} ${styles.chartCard}`}>
       <figcaption>
-        <span className={styles.chartName}>{exp.label}</span>
-        <span className={`num ${last >= 0 ? styles.gain : styles.loss}`}>{money(last)}</span>
+        <span className={styles.chartName}>{hero ? `${exp.label}, against what history predicted` : exp.label}</span>
+        <span className={`${styles.chartValue} ${Math.abs(last) < 0.005 ? styles.flat : last > 0 ? styles.gain : styles.loss}`}>{money(last)}</span>
       </figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} role="img"
         aria-label={`${exp.label}: ${money(last)} after ${n} days. ${PLACEMENT_TEXT[where]}.`}>
-        <polygon points={band(0, 4)} className={styles.bandOuter} />
-        <polygon points={band(1, 3)} className={styles.bandInner} />
-        <polyline points={median} className={styles.median} />
+        <g className={styles.bands}>
+          <polygon points={band(0, 4)} className={styles.bandOuter} />
+          <polygon points={band(1, 3)} className={styles.bandInner} />
+          <polyline points={median} className={styles.median} />
+        </g>
         <line x1={L} x2={W - R} y1={y(0)} y2={y(0)} className={styles.zero} />
         {ticks.map((v) => (
           <text key={v} x={L - 8} y={y(v) + 4} textAnchor="end" className={styles.tick}>{money(v)}</text>
         ))}
         <text x={L} y={H - 8} className={styles.tick}>day 1</text>
         <text x={W - R} y={H - 8} textAnchor="end" className={styles.tick}>day {span}</text>
-        {n > 0 && <polyline points={path} className={styles.livePath} />}
+        {n > 0 && <polyline points={path} pathLength={1} className={`${styles.livePath} ${styles.draw}`} />}
         {n > 0 && <circle cx={x(n)} cy={y(last)} r={4.5} className={styles.liveDot} />}
       </svg>
-      <p className={styles.chartNote}>{n ? PLACEMENT_TEXT[where] : "No days traded yet"}</p>
+      <p className={styles.chartNote}>
+        {n ? PLACEMENT_TEXT[where] : "No days traded yet"}
+        {hero && ". Shaded: where 20 years of history said it would usually be by each day. Line: what is actually happening."}
+      </p>
     </figure>
+  );
+}
+
+/** The expert layer's toggle: a real control, with its label following its state. */
+function NumbersToggle() {
+  return (
+    <summary>
+      <span className={styles.showLabel}>Show the numbers</span>
+      <span className={styles.hideLabel}>Hide the numbers</span>
+    </summary>
   );
 }
 
@@ -154,25 +176,30 @@ export default async function LivePage() {
 
   return (
     <div className={`shell ${styles.page}`}>
-      <header className={styles.head}>
-        <div className={styles.headTop}>
-          <p className="eyebrow">Live trial</p>
-          <span className={`pill ${snap.phase === "trial" ? "pill-done" : "pill-next"}`}>
-            {snap.phase === "trial" ? "Running" : "Shakedown"}
-          </span>
-        </div>
-        <h1>Day {n}: where the pretend money stands</h1>
-        <p className="lede">
-          On {longDate(snap.start)} each strategy got <strong>£10,000 of pretend money</strong>. Every five
-          minutes, each one decides whether to bet on the euro rising or falling against the dollar, at
-          real prices. Updated every night; last updated {longDate(snap.generated_at)}.
-        </p>
-        {snap.phase === "shakedown" && (
-          <p className={`panel ${styles.notice}`}>
-            This is a shakedown: the setup is being tested before the trial proper, which starts after
-            a final test on data no model has seen. These numbers are not results yet.
+      <header className={styles.hero}>
+        <div className={styles.heroText}>
+          <div className={styles.headTop}>
+            <p className="eyebrow">Live trial</p>
+            <span className={`pill ${snap.phase === "trial" ? "pill-done" : "pill-next"}`}>
+              {snap.phase === "trial" ? "Running" : "Shakedown"}
+            </span>
+          </div>
+          <h1>Day {n}: where the pretend money stands</h1>
+          <p className="lede">
+            On {longDate(snap.start)} each strategy got <strong>£10,000 of pretend money</strong>. Every five
+            minutes, each one decides whether to bet on the euro rising or falling against the dollar, at
+            real prices. Updated every night; last updated {longDate(snap.generated_at)}.
           </p>
-        )}
+          {snap.phase === "shakedown" && (
+            <p className={`panel ${styles.notice}`}>
+              This is a shakedown: the setup is being tested before the trial proper, which starts after
+              a final test on data no model has seen. These numbers are not results yet.
+            </p>
+          )}
+        </div>
+        <div className={styles.heroChart}>
+          <RangeChart snap={snap} k={maestroKey} start={start} hero />
+        </div>
       </header>
 
       {/* 1. Balances */}
@@ -186,15 +213,15 @@ export default async function LivePage() {
             return (
               <div key={k} className={`panel ${styles.card}`}>
                 <p className={styles.cardLabel}>{label(k)}</p>
-                <p className={`num ${styles.cardValue}`}>{money(start + change, false)}</p>
-                <p className={`num ${change >= 0 ? styles.gain : styles.loss}`}>{money(change)} so far</p>
+                <p className={styles.cardValue}>{money(start + change, false)}</p>
+                <p className={`num ${Math.abs(change) < 0.005 ? styles.flat : change > 0 ? styles.gain : styles.loss}`}>{money(change)} so far</p>
                 <p className={styles.cardMeta}>{s.trades.toLocaleString("en-GB")} {s.trades === 1 ? "trade" : "trades"} · {PLACEMENT_TEXT[where].toLowerCase()}</p>
               </div>
             );
           })}
         </div>
         <details className={styles.more}>
-          <summary>Show the numbers</summary>
+          <NumbersToggle />
           <div className={styles.moreBody}>
             <p>
               Every strategy, in pips (a pip is 0.0001 dollars per euro). Fees are charged at the
@@ -250,7 +277,7 @@ export default async function LivePage() {
           <span><span className={styles.keyLive} /> live</span>
         </p>
         <details className={styles.more}>
-          <summary>Show the numbers</summary>
+          <NumbersToggle />
           <div className={styles.moreBody}>
             <p>
               The ranges come from every run of {n} consecutive trading days in the walk-forward backtest
@@ -337,7 +364,7 @@ export default async function LivePage() {
           })()}
         </div>
         <details className={styles.more}>
-          <summary>Show the numbers</summary>
+          <NumbersToggle />
           <div className={styles.moreBody}>
             <p>
               &ldquo;Right calls&rdquo; counts the 5-minute bars a strategy held a position through and the
@@ -418,7 +445,7 @@ export default async function LivePage() {
         </div>
         {o.filled + o.failed > 0 && (
           <details className={styles.more}>
-            <summary>Show the numbers</summary>
+            <NumbersToggle />
             <div className={styles.moreBody}>
               <p>
                 &ldquo;Against paper&rdquo; is how far the fill was from the mid price at the decision, less
