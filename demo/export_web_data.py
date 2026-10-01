@@ -15,11 +15,16 @@ finished it falls back to the baselines alone. `--results DIR` overrides both.
 
 Cost slider maths
 -----------------
-Costs are linear in the round-trip cost c. For each strategy we export daily
+Costs are linear in the round-trip cost c. For each strategy we export weekly
 log returns before costs (gross) and at the model's spread (0.8 pips). The site
 recovers any cost exactly as:
     net_c = gross - (c / 0.8) * (gross - net_0.8)
-and monthly pips as gross_pips - trades * c.
+and monthly pips as gross_pips - trades * c. Weekly sums keep balances exact at
+every week's end while shipping a fifth of the daily series. The Sharpe ratio
+needs daily returns, so the sums and cross-products of the daily gross return g
+and cost return d = gross - net_0.8 are exported instead; with r = g - k*d,
+    mean = (Sg - k Sd) / n,  var = (Sgg - 2k Sgd + k^2 Sdd - n mean^2) / (n - 1),
+which gives the daily Sharpe ratio at any cost exactly.
 """
 from __future__ import annotations
 
@@ -109,6 +114,14 @@ def _read(folder: Path, instrument: str) -> tuple[pd.DataFrame, pd.DataFrame, pd
     return pooled, per_split, daily
 
 
+def _moments(g: pd.Series, d: pd.Series) -> dict:
+    """Sums the site needs to compute the daily Sharpe ratio exactly at any cost."""
+    g, d = g.to_numpy(float), d.to_numpy(float)
+    f = lambda v: float(f"{v:.10g}")  # noqa: E731
+    return {"n": int(len(g)), "g": f(g.sum()), "d": f(d.sum()), "gg": f((g * g).sum()),
+            "dd": f((d * d).sum()), "gd": f((g * d).sum())}
+
+
 def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
     pooled, per_split, daily = _read(results, instrument)
     risk = results.parent / "scores_risk"
@@ -130,6 +143,11 @@ def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
                    "label": pd.Timestamp(r.test_start).strftime("%b %Y")}
                   for r in months.itertuples()]
 
+    # Weeks end on Friday; Sunday's first bars belong to the week they open.
+    week = daily.index.tz_convert(None).to_period("W-FRI")
+    weekly = daily.groupby(week).sum()
+    week_ends = daily.index.to_series().groupby(week).max()
+
     strategies = []
     for key, (label, group, desc) in {**MAESTRO_TEXT, **STRATEGY_TEXT}.items():
         if key not in net_row.index:
@@ -143,10 +161,11 @@ def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
             "trades": int(n["n_trades"]),
             "exposure": _num(n["exposure"]) or 0.0,
             "grossPerTrade": _num(g["net_pips_per_trade"]) or 0.0,
-            "daily": {
-                "gross": [int(round(v * SCALE)) for v in daily[f"{key}|gross"]],
-                "ref":   [int(round(v * SCALE)) for v in daily[f"{key}|spread"]],
+            "weekly": {
+                "gross": [int(round(v * SCALE)) for v in weekly[f"{key}|gross"]],
+                "ref":   [int(round(v * SCALE)) for v in weekly[f"{key}|spread"]],
             },
+            "moments": _moments(daily[f"{key}|gross"], daily[f"{key}|gross"] - daily[f"{key}|spread"]),
             "monthly": {
                 "grossPips": [round(float(v), 1) for v in sp["net_pips_total"] + sp["n_trades"] * ref_cost],
                 "trades": [int(v) for v in sp["n_trades"]],
@@ -158,7 +177,10 @@ def export_results(results: Path, instrument: str = "EUR_USD") -> dict:
         "design": results.name if results.name != "scores" else results.parent.name,
         "refCostPips": ref_cost,
         "scale": SCALE,
-        "dates": [d.strftime("%Y-%m-%d") for d in daily.index],
+        "dates": [d.strftime("%Y-%m-%d") for d in week_ends],
+        "tradingDays": len(daily),
+        "firstDay": daily.index[0].strftime("%Y-%m-%d"),
+        "lastDay": daily.index[-1].strftime("%Y-%m-%d"),
         "months": month_list,
         "strategies": strategies,
     }
@@ -203,7 +225,7 @@ def main() -> None:
         path = WEB_DATA / f"{name}.json"
         path.write_text(json.dumps(obj, separators=(",", ":"), allow_nan=False), encoding="utf-8")
         print(f"wrote {path} ({path.stat().st_size / 1024:.0f} KB)")
-    print(f"  {len(data['strategies'])} strategies, {len(data['dates'])} days, "
+    print(f"  {len(data['strategies'])} strategies, {data['tradingDays']} days in {len(data['dates'])} weeks, "
           f"{len(data['months'])} months, {len(ridge['paths'])} ridge days")
 
 

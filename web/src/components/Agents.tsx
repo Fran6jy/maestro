@@ -12,6 +12,7 @@ interface Agent {
   tech: string;
   does: string;
   hands: string;
+  status: [string, string];      // [pill class, plain-language status]
   x: number;
   y: number;
 }
@@ -22,6 +23,7 @@ const AGENTS: Agent[] = [
     tech: "Hidden Markov model + Transformer",
     does: "Works out what kind of market this is: calm, trending, sideways or in crisis. Every other agent hears this first, and the risk agent sizes trades down when the weather turns.",
     hands: "The market regime, and how sure it is",
+    status: ["pill-done", "Tested over 20 years"],
     x: 9, y: 50,
   },
   {
@@ -29,6 +31,7 @@ const AGENTS: Agent[] = [
     tech: "Temporal Fusion Transformer + PatchTST",
     does: "Forecasts the next 30 minutes of EUR/USD and says how confident it is. Its forecasting style shifts with the regime it is told about.",
     hands: "Buy, sell or wait, with a confidence",
+    status: ["pill-done", "Tested over 20 years"],
     x: 30, y: 20,
   },
   {
@@ -36,6 +39,7 @@ const AGENTS: Agent[] = [
     tech: "FinBERT + GPT-4o",
     does: "Reads central-bank and economic headlines and scores whether they favour the euro or the dollar, tracking how often its reading has been right.",
     hands: "The tone of the news, and how reliable it has been",
+    status: ["pill-later", "Built, not yet in the tested system"],
     x: 30, y: 80,
   },
   {
@@ -43,6 +47,7 @@ const AGENTS: Agent[] = [
     tech: "Regime-weighted fusion, with an optional LLM reasoning layer",
     does: "Weighs the analyst against the news reader in light of the regime, settles disagreements and makes the call. It records why, in plain language, for every decision.",
     hands: "One decision, with the reasons behind it",
+    status: ["pill-later", "Built, not yet in the tested system"],
     x: 51, y: 50,
   },
   {
@@ -50,13 +55,15 @@ const AGENTS: Agent[] = [
     tech: "CVaR limits + Kelly sizing + reinforcement learning",
     does: "Decides how much to risk. It can shrink a trade or veto it outright, and no other agent can overrule it.",
     hands: "Position size, stop-loss and take-profit",
+    status: ["pill-next", "Its cost check is tested; sizing is next"],
     x: 72, y: 50,
   },
   {
     id: "execution", role: "Trader", name: "Execution agent",
     tech: "Cost-aware order placement",
-    does: "Places the order and records what it really cost, spread and slippage included. Those real costs are what the Strategy Lab above charges for.",
+    does: "Places the order and records what it really cost, spread and slippage included. The live trial measures those real costs against the fixed 0.8 pips the Strategy Lab charges.",
     hands: "Filled trades and their actual cost",
+    status: ["pill-next", "Practice orders in the live trial"],
     x: 91, y: 50,
   },
 ];
@@ -147,7 +154,7 @@ export default function Agents() {
               </div>
               <div>
                 <dt>Status</dt>
-                <dd><span className="pill pill-next">Built · being tested next</span></dd>
+                <dd><span className={`pill ${agent.status[0]}`}>{agent.status[1]}</span></dd>
               </div>
             </dl>
           </div>

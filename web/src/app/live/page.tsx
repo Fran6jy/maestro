@@ -96,7 +96,7 @@ function RangeChart({ snap, k, start, hero = false }: { snap: Snapshot; k: strin
   const last = live[n - 1] ?? 0;
   const where = n ? placement(last, exp.ranges[Math.min(n, EXPECT.horizon_days) - 1]) : "middle";
   return (
-    <figure className={`panel ${hero ? `panel-glow ${styles.heroCard}` : ""} ${styles.chartCard}`}>
+    <figure className={`panel ${hero ? styles.heroCard : ""} ${styles.chartCard}`}>
       <figcaption>
         <span className={styles.chartName}>{hero ? `${exp.label}, against what history predicted` : exp.label}</span>
         <span className={`${styles.chartValue} ${Math.abs(last) < 0.005 ? styles.flat : last > 0 ? styles.gain : styles.loss}`}>{money(last)}</span>

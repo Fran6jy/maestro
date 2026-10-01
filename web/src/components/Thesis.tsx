@@ -25,14 +25,14 @@ export default function Thesis() {
   return (
     <section className="band" aria-labelledby="thesis-title">
       <div className="shell">
-        <blockquote className={`reveal ${styles.quote}`} id="thesis-title">
+        <blockquote className={styles.quote} id="thesis-title">
           My MSc asked the right questions but couldn&rsquo;t answer them rigorously. This PhD rebuilds
           the same strategies under a leakage-free, cost-aware test, shows what they{" "}
           <span>actually achieve</span>, then asks whether a multi-agent system does better.
         </blockquote>
         <ol className={styles.steps}>
           {STEPS.map((s) => (
-            <li key={s.n} className="reveal">
+            <li key={s.n}>
               <div className={styles.stepHead}>
                 <span className={`mono ${styles.n}`}>{s.n}</span>
                 <span className={`pill ${s.status.cls}`}>{s.status.label}</span>

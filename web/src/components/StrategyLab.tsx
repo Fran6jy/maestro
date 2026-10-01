@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import EquityChart, { type ChartMonth } from "./EquityChart";
 import { RESULTS, STRATEGY, type StrategyKey } from "@/lib/data";
-import { START, dailyNet, equity, finalBalance, monthlyNet, sharpe } from "@/lib/metrics";
+import { START, equity, finalBalance, monthlyNet, sharpe, weeklyNet } from "@/lib/metrics";
 import { gbp, int, pct, signed, toMs } from "@/lib/format";
 import { useMoneyTween } from "@/lib/useTween";
 import styles from "./StrategyLab.module.css";
@@ -20,7 +20,7 @@ const PRESETS = [
   { cost: RESULTS.refCostPips, label: "Typical spread" },
   { cost: 1.5, label: "Spread + slippage" },
 ];
-const HOLD = equity(dailyNet(STRATEGY.buy_hold, RESULTS.refCostPips));
+const HOLD = equity(weeklyNet(STRATEGY.buy_hold, RESULTS.refCostPips));
 const GROUPS = [
   { id: "maestro", label: "MAESTRO" },
   { id: "msc", label: "From my MSc" },
@@ -38,12 +38,10 @@ export default function StrategyLab() {
   const costLabel = `${cost.toFixed(2)} pips`;
 
   const series = useMemo(() => {
-    const noDaily = dailyNet(s, 0);
-    const atDaily = dailyNet(s, cost);
     return {
-      no: equity(noDaily),
-      at: equity(atDaily),
-      sharpeAt: sharpe(atDaily),
+      no: equity(weeklyNet(s, 0)),
+      at: equity(weeklyNet(s, cost)),
+      sharpeAt: sharpe(s, cost),
       monthNet: monthlyNet(s, cost),
     };
   }, [s, cost]);
@@ -62,6 +60,9 @@ export default function StrategyLab() {
   const profitableMonths = series.monthNet.filter((v) => v > 0).length;
   const paidPips = s.trades * cost;
   const up = endAt >= START;
+  // Of what the strategy would have made with no costs, how much costs took.
+  const keptShare = endNo > 0 ? Math.min(1, Math.max(0, endAt / endNo)) : 1;
+  const lost = Math.max(0, endNo - endAt);
 
   return (
     <section id="lab" className="band" aria-labelledby="lab-title">
@@ -85,7 +86,7 @@ export default function StrategyLab() {
           </p>
         </aside>
 
-        <div className={`panel panel-glow ${styles.lab}`}>
+        <div className={`panel ${styles.lab}`}>
           <fieldset className={styles.picker}>
             <legend className="eyebrow">Strategy</legend>
             {GROUPS.map((group) => (
@@ -153,9 +154,20 @@ export default function StrategyLab() {
             <div className={styles.headline} aria-live="polite">
               <p className={styles.headLead}>£10,000 traded with {s.label}, {PERIOD}</p>
               <p className={`${styles.big} ${s.trades === 0 ? styles.idle : up ? styles.gain : styles.cool}`}>{gbp(shown)}</p>
-              <p className={styles.headSub}>
-                at {cost.toFixed(2)} pips per trade · <span className={styles.amberText}>{gbp(endNo)}</span> with no costs
-              </p>
+              <p className={styles.headSub}>at {cost.toFixed(2)} pips per trade</p>
+              {s.trades > 0 && (
+                <div className={styles.drain}>
+                  <div className={styles.drainBar} aria-hidden="true">
+                    <span className={styles.kept} style={{ width: `${keptShare * 100}%` }} />
+                    <span className={styles.lost} style={{ width: `${(1 - keptShare) * 100}%` }} />
+                  </div>
+                  <p className={styles.drainText}>
+                    <span className={styles.amberText}>{gbp(endNo)}</span> with no costs:{" "}
+                    <span className={styles.keptText}>{gbp(endAt)} kept</span>,{" "}
+                    <span className={styles.lostText}>{gbp(lost)} lost to costs</span>
+                  </p>
+                </div>
+              )}
             </div>
 
             <p className={styles.desc}>{s.desc}</p>

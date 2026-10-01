@@ -10,11 +10,16 @@ export default function Hero() {
   const before = finalBalance(lr, 0);
   const after = finalBalance(lr, RESULTS.refCostPips);
 
-  const stats = [
-    { value: pct(lr.hit), label: "how often a simple model calls the next 5-minute move", tone: "" },
-    { value: `${signed(lr.grossPerTrade)} pips`, label: "what it earns per trade before costs", tone: styles.amber },
-    { value: `${RESULTS.refCostPips.toFixed(1)} pips`, label: "what every trade costs in spread", tone: styles.cost },
-    { value: `${RESULTS.months.length} months`, label: "tested one at a time, never seen in advance", tone: "" },
+  // The thesis as one line of arithmetic.
+  const net = lr.grossPerTrade - RESULTS.refCostPips;
+  const terms = [
+    { value: pct(lr.hit), label: "of next moves called right", tone: "" },
+    { op: "→" },
+    { value: signed(lr.grossPerTrade), label: "pips earned per trade", tone: styles.amber },
+    { op: "−" },
+    { value: RESULTS.refCostPips.toFixed(2), label: "pips every trade costs", tone: styles.cost },
+    { op: "=" },
+    { value: signed(net), label: "pips per trade, after costs", tone: styles.cool },
   ];
 
   return (
@@ -45,14 +50,19 @@ export default function Hero() {
       </div>
 
       <div className={`shell ${styles.statsWrap}`}>
-        <dl className={styles.stats}>
-          {stats.map((s) => (
-            <div key={s.label}>
-              <dt>{s.label}</dt>
-              <dd className={`num ${s.tone}`}>{s.value}</dd>
-            </div>
-          ))}
-        </dl>
+        <p className={styles.equation}
+          aria-label={`A simple model calls ${pct(lr.hit)} of next moves right and earns ${signed(lr.grossPerTrade)} pips per trade; every trade costs ${RESULTS.refCostPips.toFixed(2)} pips, leaving ${signed(net)} pips per trade.`}>
+          {terms.map((t, i) =>
+            "op" in t ? (
+              <span key={i} className={styles.op} aria-hidden="true">{t.op}</span>
+            ) : (
+              <span key={i} className={styles.term} aria-hidden="true">
+                <span className={`${styles.termValue} ${t.tone}`}>{t.value}</span>
+                <span className={styles.termLabel}>{t.label}</span>
+              </span>
+            ),
+          )}
+        </p>
         <p className={styles.caption}>
           Behind this text: {RIDGE.paths.length} real EUR/USD trading days, midnight to midnight UTC.
           Each ridge is one day. Point at one to read it.

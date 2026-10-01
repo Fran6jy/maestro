@@ -44,15 +44,12 @@ export default function Roadmap() {
             same checks as the one before it.
           </p>
         </div>
-        <ol className={styles.track}>
+        <ol className={styles.list}>
           {ITEMS.map((it, i) => (
-            <li key={it.title} className={`reveal ${styles.item}`} data-state={it.status[0].replace("pill-", "")}>
-              <div className={styles.marker} aria-hidden="true">
-                <span className={styles.dot} />
-                {i < ITEMS.length - 1 && <span className={styles.rail} />}
-              </div>
-              <div className={styles.body}>
-                <span className={`pill ${it.status[0]}`}>{it.status[1]}</span>
+            <li key={it.title} className={styles.item} data-state={it.status[0].replace("pill-", "")}>
+              <span className={styles.num} aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+              <div className={styles.text}>
+                <p className={styles.state}>{it.status[1]}</p>
                 <h3>{it.title}</h3>
                 <p>{it.body}</p>
               </div>

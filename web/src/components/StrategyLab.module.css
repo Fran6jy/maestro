@@ -249,6 +249,51 @@
   color: var(--ink-2);
 }
 
+/* What costs take, as you drag: the whole bar is the no-cost result. */
+.drain {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  max-width: 560px;
+}
+
+.drainBar {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.kept,
+.lost {
+  display: block;
+  height: 100%;
+  transition: width 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.kept {
+  background: var(--cool);
+}
+
+.lost {
+  background: var(--cost);
+}
+
+.drainText {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.keptText {
+  color: var(--cool);
+}
+
+.lostText {
+  color: var(--cost);
+}
+
 .desc {
   color: var(--ink-2);
   max-width: 44rem;

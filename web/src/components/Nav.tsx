@@ -44,9 +44,6 @@ export default function Nav() {
             </li>
           ))}
         </ul>
-        <Link href="/#lab" className={`btn btn-primary ${styles.cta}`}>
-          Open the lab
-        </Link>
         <button
           type="button"
           className={styles.menuBtn}

@@ -193,7 +193,7 @@ export default function EquityChart({
       </svg>
       {hover !== null && (
         <div className={styles.tip} style={{ left: tipLeft }}>
-          <div className={styles.tipDate}>{niceDate(isoDates[hover])}</div>
+          <div className={styles.tipDate}>Week to {niceDate(isoDates[hover])}</div>
           <div className={styles.tipNo}>No costs {gbp(noCost[hover])}</div>
           <div className={styles.tipAt}>At {costLabel} {gbp(atCost[hover])}</div>
         </div>

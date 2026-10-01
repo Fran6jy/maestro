@@ -114,42 +114,46 @@
   gap: 18px;
 }
 
-.stats {
+/* The thesis as arithmetic: value over label, operators between. */
+.equation {
   margin: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-top: 1px solid var(--line-2);
-  background: linear-gradient(180deg, rgba(7, 9, 12, 0.6), rgba(7, 9, 12, 0.92));
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-
-.stats > div {
   display: flex;
-  flex-direction: column-reverse;
-  justify-content: flex-end;
-  gap: 8px;
-  padding: 20px 20px 4px 0;
-  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px clamp(14px, 2.2vw, 30px);
+  padding-top: 26px;
+  border-top: 1px solid var(--line-2);
 }
 
-.stats > div + div {
-  padding-left: 20px;
-  border-left: 1px solid var(--line);
+.term {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.stats dt {
-  font-size: var(--fs-sm);
-  color: var(--ink-3);
-  line-height: 1.45;
-}
-
-.stats dd {
-  margin: 0;
-  font-size: clamp(1.5rem, 2.6vw, 2.25rem);
-  font-weight: 500;
+.termValue {
+  font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-size: clamp(1.9rem, 3.6vw, 3rem);
+  font-weight: 600;
+  font-stretch: 85%;
+  font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: -0.02em;
   line-height: 1;
+}
+
+.termLabel {
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  max-width: 13ch;
+  line-height: 1.35;
+}
+
+.op {
+  font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-size: clamp(1.6rem, 3vw, 2.5rem);
+  font-weight: 300;
+  line-height: 1.1;
+  color: var(--ink-3);
 }
 
 .amber {
@@ -160,28 +164,22 @@
   color: var(--cost);
 }
 
+.cool {
+  color: var(--cool);
+}
+
 .caption {
   font-size: var(--fs-xs);
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-family: var(--font-mono), monospace;
 }
 
-@media (max-width: 900px) {
-  .stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 640px) {
+  .op {
+    font-size: 1.5rem;
   }
-  .stats > div:nth-child(3) {
-    padding-left: 0;
-    border-left: 0;
-  }
-  .stats > div:nth-child(n + 3) {
-    border-top: 1px solid var(--line);
-  }
-}
 
-@media (max-width: 480px) {
-  .stats dd {
-    font-size: clamp(1.2rem, 6.2vw, 1.5rem);
-    white-space: nowrap;
+  .termLabel {
+    max-width: 11ch;
   }
 }

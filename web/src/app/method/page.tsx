@@ -60,8 +60,8 @@ function WalkForward() {
 }
 
 export default function MethodPage() {
-  const first = RESULTS.dates[0];
-  const last = RESULTS.dates[RESULTS.dates.length - 1];
+  const first = RESULTS.firstDay;
+  const last = RESULTS.lastDay;
 
   return (
     <div className={`shell ${styles.page}`}>
@@ -90,7 +90,7 @@ export default function MethodPage() {
               OANDA EUR/USD prices in 5-minute bars, with bid and ask, from January 2005. The first
               year is only ever used for training, and everything from 7 March 2026 is sealed for one
               final confirmation test, so results cover {first} to {last}:{" "}
-              {RESULTS.dates.length.toLocaleString("en-GB")} trading days across {RESULTS.months.length}{" "}
+              {RESULTS.tradingDays.toLocaleString("en-GB")} trading days across {RESULTS.months.length}{" "}
               monthly test windows. Macro data (VIX, US yields, interest rates and inflation) comes from
               FRED and reaches a bar only once it had been published.
             </p>

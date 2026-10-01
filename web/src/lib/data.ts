@@ -26,7 +26,8 @@ export interface Strategy {
   trades: number;
   exposure: number;
   grossPerTrade: number;
-  daily: { gross: number[]; ref: number[] };
+  weekly: { gross: number[]; ref: number[] };       // weekly log returns × scale
+  moments: { n: number; g: number; d: number; gg: number; dd: number; gd: number };  // daily sums, for Sharpe
   monthly: { grossPips: number[]; trades: number[] };
 }
 
@@ -40,7 +41,10 @@ export interface Results {
   instrument: string;
   refCostPips: number;
   scale: number;
-  dates: string[];
+  dates: string[];         // the last trading day of each week
+  tradingDays: number;
+  firstDay: string;
+  lastDay: string;
   months: Month[];
   strategies: Strategy[];
 }

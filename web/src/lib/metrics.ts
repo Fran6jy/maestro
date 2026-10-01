@@ -4,12 +4,12 @@ import { RESULTS, type Strategy } from "./data";
 export const START = 10_000;
 
 /**
- * Daily net log returns at any round-trip cost.
+ * Weekly net log returns at any round-trip cost.
  * Costs are linear in the cost per trade, so any cost is recovered exactly from
  * the exported gross series and the series at the reference cost (0.8 pips).
  */
-export function dailyNet(s: Strategy, costPips: number): Float64Array {
-  const { gross, ref } = s.daily;
+export function weeklyNet(s: Strategy, costPips: number): Float64Array {
+  const { gross, ref } = s.weekly;
   const k = costPips / RESULTS.refCostPips;
   const out = new Float64Array(gross.length);
   for (let i = 0; i < gross.length; i++) {
@@ -18,28 +18,29 @@ export function dailyNet(s: Strategy, costPips: number): Float64Array {
   return out;
 }
 
-/** Growth of START given daily log returns. */
-export function equity(daily: Float64Array, start = START): Float64Array {
-  const out = new Float64Array(daily.length);
+/** Growth of START given log returns per period. */
+export function equity(returns: Float64Array, start = START): Float64Array {
+  const out = new Float64Array(returns.length);
   let acc = 0;
-  for (let i = 0; i < daily.length; i++) {
-    acc += daily[i];
+  for (let i = 0; i < returns.length; i++) {
+    acc += returns[i];
     out[i] = start * Math.exp(acc);
   }
   return out;
 }
 
-/** Annualised Sharpe ratio from daily returns. */
-export function sharpe(daily: Float64Array): number {
-  const n = daily.length;
+/**
+ * Annualised Sharpe ratio of daily returns at any cost, exactly, from the exported daily
+ * sums: with r = g - k*d (g gross, d the cost at 0.8 pips, k = cost / 0.8),
+ * mean = (Sg - k Sd) / n and var = (Sgg - 2k Sgd + k^2 Sdd - n mean^2) / (n - 1).
+ */
+export function sharpe(s: Strategy, costPips: number): number {
+  const { n, g, d, gg, dd, gd } = s.moments;
   if (n < 2) return 0;
-  let mean = 0;
-  for (const v of daily) mean += v;
-  mean /= n;
-  let sq = 0;
-  for (const v of daily) sq += (v - mean) ** 2;
-  const sd = Math.sqrt(sq / (n - 1));
-  return sd > 0 ? (mean / sd) * Math.sqrt(252) : 0;
+  const k = costPips / RESULTS.refCostPips;
+  const mean = (g - k * d) / n;
+  const variance = (gg - 2 * k * gd + k * k * dd - n * mean * mean) / (n - 1);
+  return variance > 0 ? (mean / Math.sqrt(variance)) * Math.sqrt(252) : 0;
 }
 
 /** Net pips per test month at a given cost. */
@@ -49,7 +50,7 @@ export function monthlyNet(s: Strategy, costPips: number): number[] {
 
 /** Final balance at a cost, without building the whole curve. */
 export function finalBalance(s: Strategy, costPips: number): number {
-  const d = dailyNet(s, costPips);
+  const d = weeklyNet(s, costPips);
   let acc = 0;
   for (const v of d) acc += v;
   return START * Math.exp(acc);
