@@ -73,11 +73,15 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
    than all of its profit, negative at 1.5 pips, and it is the best of many variants tried. On 4-hour
    and daily bars MAESTRO is below 50% hit and loses; only the moving-average crossover is faintly
    positive (Sharpe 0.25 and 0.22, also not significant). The hourly cost filter loses (−0.11).
-2. The monthly-retraining comparison (`refit1_roll12_fast`, 243 blocks), started 1 Oct 2026:
-   Kaggle backwards (`launch --refit-months 1 --train-months 12 --reverse --budget-hours 11`,
-   relaunch each session until done; `collect` after each) and the laptop forwards (log
-   `C:\tmp\maestro_outputs\maestro\monthly_laptop.log`). Score with `--score-only`, then run
-   `risk_layer --refit-months 1 --train-months 12 --fast`.
+2. ~~Monthly retraining~~ done 2 Oct 2026 (`refit1_roll12_fast`, 243 blocks, Kaggle backwards +
+   laptop forwards, scored with the risk layer). Retraining every month instead of every quarter
+   helps a little and not significantly. At 0.8 pips, monthly vs quarterly: top 10% Sharpe −2.22 vs
+   −2.50 (£1,780 vs £1,569 from £10,000), every signal −2.23 vs −2.51, cost check −0.70 vs −0.89
+   (£6,467 vs £6,061, 80 vs 74 months profitable). Paired daily returns, monthly minus quarterly:
+   t = +0.70 (top 10%), +1.91 (every signal), +0.45 (cost check). Hit rates move by 0.1 points.
+   Nothing becomes profitable; Bollinger (−0.30) still beats every MAESTRO version. Recommendation:
+   **freeze the quarterly design** (three times cheaper to run live, same conclusion), awaiting
+   confirmation.
 3. Freeze the design; run the sealed holdout once (`--holdout`).
 4. Regenerate the live expectations from the frozen design and commit them *before* the trial
    (`python -m maestro.live.expectations`): they are the trial's published prediction.

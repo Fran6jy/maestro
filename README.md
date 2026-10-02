@@ -101,7 +101,7 @@ MAESTRO results fix which variant trades and the holdout confirmation has run.
 | MSc strategies scored over 20 years | Done: small real edge, nothing beats costs |
 | MAESTRO over 20 years, power test, risk layer | Done (re-run after the regime fix): best hit rate, still loses after costs |
 | Horizon sweep (1-hour, 4-hour, daily bars) | Done: slower bars don't help; no result distinguishable from luck |
-| Monthly vs quarterly retraining | Next |
+| Monthly vs quarterly retraining | Done: monthly helps a little, not significantly; nothing becomes profitable |
 | Live trial on an OANDA **practice** account | Paper shakedown running |
 | Cross-asset extension (gold, S&P 500) | Later |
 
