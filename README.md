@@ -182,7 +182,8 @@ retrained from its settings. The one model that is kept is the live trial's, wri
 
 The methodology is documented in full on the site's
 [method page](https://maestro-research.vercel.app/method) and in
-[`docs/THESIS_NARRATIVE.md`](docs/THESIS_NARRATIVE.md).
+[`docs/THESIS_NARRATIVE.md`](docs/THESIS_NARRATIVE.md). Every decision that shaped the results,
+with its date, evidence and commit, is in [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
 ## The website
 

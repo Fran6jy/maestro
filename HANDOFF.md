@@ -24,6 +24,7 @@ If a task doesn't serve it, it is future work.
 | Regime look-ahead fixed | HMM regimes now forward-filtered; all MAESTRO results before the fix are invalid and being re-run | `agents/regime/hmm_regime.py` |
 | Live trial | Built and in paper-only shakedown on a private always-on server; nightly public snapshot, health check and a hidden live page built | `live/`, `deploy/live/`, `web/src/app/live/` |
 | Tests | 86 passing: look-ahead, data timing, causal regimes, store, runner, live parity, live snapshot, practice-only client | `tests/` |
+| Decision log | Every decision, dated, with its evidence, rejected alternatives and commit | `docs/DECISIONS.md` |
 | Public website | Live; MAESTRO's corrected 20-year results in the Strategy Lab (cost-check version included) | [maestro-research.vercel.app](https://maestro-research.vercel.app), `web/` |
 
 ## MAESTRO: re-run after the regime fix
