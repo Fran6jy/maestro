@@ -6,7 +6,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const revalidate = 3600;
 
-const FEATURED = ["risk_cost_filter", "bollinger_20_2", "logreg_lag5", "buy_hold"];
+const FEATURED = ["maestro_top10", "risk_cost_filter", "bollinger_20_2", "logreg_lag5"];
 const MINUS = "−";
 
 function money(v: number, signed: boolean): string {
@@ -21,7 +21,9 @@ export default async function Image() {
   const ready = !!snap && !!snap.start && snap.days.length > 0;
   const start = snap?.start_gbp ?? EXPECT.start_balance;
   const maestro = snap?.order_strategy ?? FEATURED[0];
-  const keys = ready ? [maestro, ...FEATURED.slice(1)].filter((k) => snap!.strategies[k]) : [];
+  const keys = ready
+    ? [maestro, ...FEATURED.filter((k) => k !== maestro)].filter((k) => snap!.strategies[k]).slice(0, 4)
+    : [];
   const n = snap?.days.length ?? 0;
 
   // MAESTRO's predicted range and live line, faint, across the bottom of the card.

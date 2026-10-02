@@ -81,10 +81,14 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
 3. Freeze the design; run the sealed holdout once (`--holdout`).
 4. Regenerate the live expectations from the frozen design and commit them *before* the trial
    (`python -m maestro.live.expectations`): they are the trial's published prediction.
-5. The practice-order variant is decided: **`risk_cost_filter`** (5-minute bars, MAESTRO's forecasts
-   traded only when the expected move beats 0.8 pips + 0.5). Train the live model (`live.deploy`),
-   copy it to the server, restart with `--orders risk_cost_filter` and `MAESTRO_LIVE_PHASE=trial`.
-   The 4–8 week trial starts then; go public as in `deploy/live/README.md`.
+5. The practice-order variant is decided (2 Oct 2026): **`maestro_top10`**, about 6 trades a day.
+   The cost check (`risk_cost_filter`) was the first choice but trades in bursts: whole quarters
+   with no trades (2021 Q1, 2025 Q1), 28 qualifying bars in 2026 Q1, and none in the shakedown's
+   first 1.5 days (largest live forecast 0.67 pips against its 1.3-pip bar). Practice orders exist
+   to measure real fills, spreads and delays, which needs orders, so they go to `maestro_top10`;
+   the cost check is still paper-traded and featured beside it on the live page. Train the live
+   model (`live.deploy`), copy it to the server, restart with `--orders maestro_top10` and
+   `MAESTRO_LIVE_PHASE=trial`. The 4–8 week trial starts then; go public as in `deploy/live/README.md`.
 
 ## Live trial
 

@@ -30,8 +30,10 @@ export const metadata: Metadata = {
 };
 
 const REPO = "https://github.com/Fran6jy/maestro";
-const DEFAULT_MAESTRO = "risk_cost_filter";
-const OTHERS = ["bollinger_20_2", "logreg_lag5", "buy_hold"];
+// The version that places practice orders leads; MAESTRO's cost check and the two
+// strongest MSc strategies sit beside it. Every strategy is in the full table.
+const DEFAULT_MAESTRO = "maestro_top10";
+const OTHERS = ["risk_cost_filter", "bollinger_20_2", "logreg_lag5"];
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 function money(v: number, signed = true): string {
@@ -158,7 +160,7 @@ export default async function LivePage() {
 
   const start = snap.start_gbp ?? EXPECT.start_balance;
   const maestroKey = snap.order_strategy ?? DEFAULT_MAESTRO;
-  const featured = [maestroKey, ...OTHERS].filter((k) => snap.strategies[k]);
+  const featured = [maestroKey, ...OTHERS.filter((k) => k !== maestroKey)].filter((k) => snap.strategies[k]).slice(0, 4);
   const all = Object.keys(snap.strategies).sort((a, b) =>
     balanceChange(snap.strategies[b].daily.ref, start) - balanceChange(snap.strategies[a].daily.ref, start));
   const n = snap.days.length;

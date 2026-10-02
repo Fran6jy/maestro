@@ -13,7 +13,7 @@ After each 5-minute bar closes:
      market order tagged with the bar time, so the same bar is never ordered twice
   7. write status.json (a heartbeat anyone can check)
 
-    python -m maestro.live.loop --models /state/models/current --orders risk_cost_filter
+    python -m maestro.live.loop --models /state/models/current --orders maestro_top10
     python -m maestro.live.loop --models ... --once          # one cycle, then exit
 """
 from __future__ import annotations
