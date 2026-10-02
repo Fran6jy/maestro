@@ -69,12 +69,19 @@ def main() -> None:
     p.add_argument("--train-months", type=int, default=12)
     p.add_argument("--expanding", action="store_true")
     p.add_argument("--fast", action="store_true", help="the design was trained with --fast")
+    p.add_argument("--design", type=Path, default=None,
+                   help="folder holding the design's blocks (default: <outputs>/maestro/<design tag>)")
+    p.add_argument("--holdout", action="store_true",
+                   help="unlock the sealed holdout (maestro.data.holdout): final confirmation run only")
     args = p.parse_args()
+    if args.holdout:
+        from maestro.data.holdout import unlock
+        unlock()
 
     train_months = None if args.expanding else args.train_months
     prefix = "" if args.granularity == "M5" else f"{args.granularity}_"
     tag = prefix + design_tag(args.refit_months, train_months) + ("_fast" if args.fast else "")
-    design = OUTPUT_DIR / "maestro" / tag
+    design = args.design or OUTPUT_DIR / "maestro" / tag
     close = load_close(args.instrument, args.granularity)
     min_bars = MIN_TRAIN_BARS[args.granularity]
     blocks = refit_plan(close, args.refit_months, train_months, min_train_bars=min_bars)

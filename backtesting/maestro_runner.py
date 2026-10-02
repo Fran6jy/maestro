@@ -185,6 +185,9 @@ def main() -> None:
     p.add_argument("--score-only", action="store_true", help="skip training; score the blocks already saved")
     p.add_argument("--holdout", action="store_true",
                    help="unlock the sealed holdout (maestro.data.holdout): final confirmation run only")
+    p.add_argument("--out", type=Path, default=None,
+                   help="output folder (default: <outputs>/maestro/<design tag>); the holdout confirmation "
+                        "uses its own folder so the frozen results are never touched")
     p.add_argument("--fast", action="store_true", help=f"faster TFT training: {FAST_TFT}")
     p.add_argument("--shard", default=None, metavar="I/N",
                    help="train only blocks with block_id %% N == I (split work across GPUs or machines)")
@@ -204,7 +207,7 @@ def main() -> None:
     epochs = args.epochs or (1 if args.smoke else EPOCHS)
     prefix = "" if args.granularity == "M5" else f"{args.granularity}_"
     tag = prefix + design_tag(args.refit_months, train_months) + ("_fast" if args.fast else "")
-    out_dir = OUTPUT_DIR / "maestro" / (tag + ("_smoke" if args.smoke else ""))
+    out_dir = args.out or OUTPUT_DIR / "maestro" / (tag + ("_smoke" if args.smoke else ""))
 
     pooled = run_design(load_close(args.instrument, args.granularity), out_dir, args.instrument,
                         lambda: load_features(args.instrument, args.granularity),
