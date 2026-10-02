@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Toc from "@/components/Toc";
 import { MSC, RESULTS } from "@/lib/data";
-import { pct } from "@/lib/format";
+import holdout from "@/data/holdout.json";
+import { gbp, niceDate, pct } from "@/lib/format";
 import styles from "./method.module.css";
 
 export const metadata: Metadata = {
@@ -12,12 +13,19 @@ export const metadata: Metadata = {
 };
 
 const REPO = "https://github.com/Fran6jy/maestro/blob/main";
+const HOLDOUT_ROWS = ["maestro_top10", "maestro_ungated", "risk_cost_filter", "maestro_gated",
+  "bollinger_20_2", "sma_20_200", "logreg_lag5", "buy_hold"];
+
+function signedGbp(v: number): string {
+  return `${v > 0 ? "+" : v < 0 ? "\u2212" : ""}£${Math.abs(Math.round(v)).toLocaleString("en-GB")}`;
+}
 
 const SECTIONS = [
   { id: "data", label: "The data" },
   { id: "walk-forward", label: "Walk-forward testing" },
   { id: "costs", label: "Costs" },
   { id: "timing", label: "No peeking" },
+  { id: "holdout", label: "The sealed test" },
   { id: "metrics", label: "What each number means" },
   { id: "strategies", label: "Strategy settings" },
   { id: "msc", label: "The MSc figures" },
@@ -85,8 +93,8 @@ export default function MethodPage() {
             <h2>The data</h2>
             <p>
               OANDA EUR/USD prices in 5-minute bars, with bid and ask, from January 2005. The first
-              year is only ever used for training, and everything from 7 March 2026 is sealed for one
-              final confirmation test, so results cover {first} to {last}:{" "}
+              year is only ever used for training, and everything from 7 March 2026 was sealed while
+              the strategies were built and compared, so the results on this site cover {first} to {last}:{" "}
               {RESULTS.tradingDays.toLocaleString("en-GB")} trading days across {RESULTS.months.length}{" "}
               monthly test windows. Macro data (VIX, US yields, interest rates and inflation) comes from
               FRED and reaches a bar only once it had been published.
@@ -149,6 +157,52 @@ export default function MethodPage() {
             </p>
             <p>
               See <a href={`${REPO}/tests`} target="_blank" rel="noreferrer">the tests</a>.
+            </p>
+          </section>
+
+          <section id="holdout">
+            <h2>The sealed test</h2>
+            <p>
+              Comparing strategies on the same data you tune them on flatters them, however careful
+              the test. So everything from 7 March 2026 stayed sealed while the designs above were
+              built, compared and corrected. On 2 October 2026 the design was frozen, the 20-year
+              backtest&rsquo;s expected range for every strategy was committed to the public repository,
+              and the sealed period was opened once: {holdout.days} trading days,{" "}
+              {niceDate(holdout.start)} to {niceDate(holdout.end)}. Nothing was changed afterwards.
+            </p>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Strategy</th><th>Trades</th><th>Right about next move</th><th>£10,000 became</th>
+                    <th>After {holdout.rangeDays} days</th><th>Expected range (5%&ndash;95%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {HOLDOUT_ROWS.map((k) => {
+                    const h = holdout.strategies[k as keyof typeof holdout.strategies];
+                    const label = RESULTS.strategies.find((s) => s.key === k)?.label ?? k;
+                    return (
+                      <tr key={k}>
+                        <td>{label}</td>
+                        <td className="num">{h.trades.toLocaleString("en-GB")}</td>
+                        <td className="num">{h.hit === null ? "n/a" : pct(h.hit)}</td>
+                        <td className="num">{gbp(h.final)}</td>
+                        <td className="num">{signedGbp(h.change65)}</td>
+                        <td className="num">{h.range65 ? `${signedGbp(h.range65[0])} to ${signedGbp(h.range65[4])}` : "n/a"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p>
+              The answer did not change: MAESTRO&rsquo;s accuracy is real and too small for the costs,
+              and every strategy landed inside the range the backtest had given it. The cost-check
+              version made {holdout.strategies.risk_cost_filter.trades} trades in seven months, too
+              few to read, which is why the live trial&rsquo;s practice orders come from the top-10%
+              version instead. Source:{" "}
+              <code>{holdout.source}</code>.
             </p>
           </section>
 

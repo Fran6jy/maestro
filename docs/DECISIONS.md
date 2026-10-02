@@ -97,6 +97,16 @@ until the one confirmation run below. Commits are by the author alone.
   March whole. The frozen results folder is untouched. An earlier launch that would have
   written into the frozen folder was stopped before its first block finished (verified: 81
   blocks, scores unchanged). Results are reported whatever they say; see the entry below.
+- **Holdout result: the finding holds.** 7 March to 2 October 2026, 180 trading days, four
+  retraining blocks. Top 10%: 1,042 trades, 51.6% hit, +0.15 pips/trade before costs, Sharpe
+  −4.38, £10,000 → £9,440. Every signal: 51.0%, Sharpe −5.14, £9,301. Cost check: 50 trades,
+  +£44 (too few trades to read). As designed: no trades. Bollinger bands: Sharpe −1.69, £9,574.
+  Moving-average crossover: +0.10, £10,031. Logistic regression: £4,588. After 65 days every
+  featured strategy sat inside its pre-registered 5–95% range: top 10% −£113 against
+  [−449, +35]; cost check +£32 against [−277, +65]; Bollinger −£83 against [−448, +449];
+  logistic regression −£1,839 against [−2,999, −1,152]. Conclusion confirmed on data no
+  decision touched: MAESTRO's accuracy is real and too small for the costs. Decision: none
+  (none allowed); the trial proceeds with the top-10% variant on practice orders.
 
 ## Standing rules
 

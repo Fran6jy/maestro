@@ -19,7 +19,7 @@ If a task doesn't serve it, it is future work.
 | MSc re-examined | 37.56% / 0.599 come from two unrelated tests; the regression re-runs at 46.6% | README, site `/method` |
 | Shared evaluator | One scorer for every strategy, 243 walk-forward months (2006–2026), retraining on the latest 12 months, 5-day embargo, 0.8 pip round trip, costs charged on turnover | `backtesting/baselines.py` |
 | Data | OANDA EUR/USD + GBP/USD 5-minute candles with bid/ask from 2005, FRED macro stamped at publication time, ingested daily by GitHub Actions into a private repo; 1-hour, 4-hour and daily bars built from them | `data/pipeline/store.py`, `data/features/macro.py` |
-| Holdout | Everything from 7 Mar 2026 is sealed; `--holdout` opens it once, for the frozen design | `data/holdout.py` |
+| Holdout | Sealed from 7 Mar 2026; opened once on 2 Oct 2026 for the frozen design (180 days to 2 Oct): same answer, every strategy inside its pre-registered range. Outputs in `C:\tmp\maestro_outputs_holdout\` (backed up to the server); the frozen folder is untouched | `data/holdout.py`, `docs/DECISIONS.md` |
 | Baselines, 20 years | Small real edge (52–53% hit, +0.1–0.7 pips/trade before costs); none beats costs | README table |
 | Regime look-ahead fixed | HMM regimes now forward-filtered; all MAESTRO results before the fix are invalid and being re-run | `agents/regime/hmm_regime.py` |
 | Live trial | Built and in paper-only shakedown on a private always-on server; nightly public snapshot, health check and a hidden live page built | `live/`, `deploy/live/`, `web/src/app/live/` |
@@ -84,9 +84,10 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
    **Design frozen 2 Oct 2026: quarterly retraining on the latest 12 months, 5-minute bars, fast
    TFT settings (`refit3_roll12_fast`), the four MAESTRO variants scored as they stand.** Nothing
    in MAESTRO is tuned or changed after this point.
-3. Freeze the design; run the sealed holdout once (`--holdout`).
-4. Regenerate the live expectations from the frozen design and commit them *before* the trial
-   (`python -m maestro.live.expectations`): they are the trial's published prediction.
+3. ~~Freeze the design; run the sealed holdout once~~ done 2 Oct 2026 (`maestro_runner ... --holdout
+   --out C:/tmp/maestro_outputs_holdout/maestro/refit3_roll12_fast`, then `risk_layer ... --holdout
+   --design <same>`). Result in `docs/DECISIONS.md` and `web/src/data/holdout.json`.
+4. ~~Regenerate the live expectations~~ committed as `e8b067d` before the holdout was opened.
 5. The practice-order variant is decided (2 Oct 2026): **`maestro_top10`**, about 6 trades a day.
    The cost check (`risk_cost_filter`) was the first choice but trades in bursts: whole quarters
    with no trades (2021 Q1, 2025 Q1), 28 qualifying bars in 2026 Q1, and none in the shakedown's

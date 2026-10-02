@@ -61,6 +61,13 @@ regime depended on later prices. Everything above was re-run on the fixed code; 
 changed MAESTRO's results, and the baselines use prices only. The cost-check version was first tried
 after results from before the fix had been seen, so the sealed holdout is its real test.
 
+**The sealed period agrees.** The design was frozen on 2 October 2026 (quarterly retraining; monthly
+helped a little and not significantly) and the data sealed from 7 March 2026 was opened once, for
+180 trading days to 2 October. MAESTRO's top-10% version called 51.6% of moves right and turned
+£10,000 into £9,440; its cost-check version made 50 trades and £44; Bollinger bands ended at £9,574.
+Before the period was opened, the 20-year backtest's expected range for every strategy had been
+committed (`web/src/data/live_expectations.json`); every strategy landed inside it.
+
 **How the evaluation is checked.**
 - Macro inputs (VIX, yields, rates, CPI) reach a bar only once they were public.
 - Regimes are forward-filtered: a bar's regime uses only bars up to it. Tests prove that rewriting
@@ -102,6 +109,7 @@ MAESTRO results fix which variant trades and the holdout confirmation has run.
 | MAESTRO over 20 years, power test, risk layer | Done (re-run after the regime fix): best hit rate, still loses after costs |
 | Horizon sweep (1-hour, 4-hour, daily bars) | Done: slower bars don't help; no result distinguishable from luck |
 | Monthly vs quarterly retraining | Done: monthly helps a little, not significantly; nothing becomes profitable |
+| Final test on sealed data, 7 Mar to 2 Oct 2026 | Done: same answer; every strategy inside its pre-registered range |
 | Live trial on an OANDA **practice** account | Paper shakedown running |
 | Cross-asset extension (gold, S&P 500) | Later |
 

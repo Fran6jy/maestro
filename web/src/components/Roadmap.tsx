@@ -9,7 +9,7 @@ const ITEMS = [
   {
     status: ["pill-done", "Done"],
     title: "A fair test",
-    body: "20 years of walk-forward months, one shared scorer, macro data used only once published, a sealed final test period, and automated checks that no strategy sees the future.",
+    body: "20 years of walk-forward months, one shared scorer, macro data used only once published, automated checks that no strategy sees the future, and a sealed final period, opened once on 2 October 2026: same answer, every strategy inside its pre-registered range.",
   },
   {
     status: ["pill-done", "Done"],
@@ -24,7 +24,7 @@ const ITEMS = [
   {
     status: ["pill-next", "Shakedown"],
     title: "Live practice trial",
-    body: "MAESTRO and the MSc strategies trade side by side on every 5-minute bar, paper-traded at live OANDA prices, and one MAESTRO version will also place orders on a practice account. Running as a paper-only shakedown now; the trial proper starts after a final test on data no model has seen. No real money.",
+    body: "MAESTRO and the MSc strategies trade side by side on every 5-minute bar, paper-traded at live OANDA prices, and one MAESTRO version will also place orders on a practice account. Running as a paper-only shakedown now; the trial proper starts next. No real money.",
   },
   {
     status: ["pill-later", "Later"],
