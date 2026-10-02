@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Toc from "@/components/Toc";
 import { MSC, RESULTS } from "@/lib/data";
 import { pct } from "@/lib/format";
 import styles from "./method.module.css";
@@ -76,11 +77,7 @@ export default function MethodPage() {
       <div className={styles.layout}>
         <nav className={styles.toc} aria-label="On this page">
           <p className="eyebrow">On this page</p>
-          <ol>
-            {SECTIONS.map((s) => (
-              <li key={s.id}><a href={`#${s.id}`}>{s.label}</a></li>
-            ))}
-          </ol>
+          <Toc sections={SECTIONS} />
         </nav>
 
         <article className={styles.article}>

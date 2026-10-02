@@ -1,0 +1,32 @@
+.page {
+  min-height: 70svh;
+  padding-top: calc(150px + env(safe-area-inset-top, 0px));
+  padding-bottom: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 46rem;
+}
+
+.code {
+  font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-size: clamp(4rem, 12vw, 9rem);
+  font-weight: 600;
+  font-stretch: 78%;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  color: var(--line-2);
+}
+
+.page h1 {
+  font-size: var(--fs-2xl);
+  font-stretch: 78%;
+  line-height: 1;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}

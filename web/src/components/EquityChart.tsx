@@ -20,6 +20,7 @@ interface Props {
   monthNet: number[];
   costLabel: string;
   title: string;
+  animateKey: string;      // changes when the strategy changes, so the lines redraw
 }
 
 const Y_MIN = 1;
@@ -28,11 +29,26 @@ const TICKS = [1, 10, 100, 1_000, 10_000];
 const TICK_LABEL: Record<number, string> = { 1: "£1", 10: "£10", 100: "£100", 1000: "£1k", 10000: "£10k" };
 
 export default function EquityChart({
-  isoDates, dates, noCost, atCost, hold, months, monthNet, costLabel, title,
+  isoDates, dates, noCost, atCost, hold, months, monthNet, costLabel, title, animateKey,
 }: Props) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [W, setW] = useState(900);
   const [hover, setHover] = useState<number | null>(null);
+  const [inView, setInView] = useState(false);
+
+  // The draw-in starts the first time the chart is actually on screen.
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        setInView(true);
+        io.disconnect();
+      }
+    }, { threshold: 0.35 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = boxRef.current;
@@ -143,16 +159,20 @@ export default function EquityChart({
           </g>
         ))}
 
-        <path d={paths.gap} className={styles.gap} />
-        {hold && <path d={paths.hold} className={styles.hold} />}
-        <path d={paths.no} className={styles.lineNo} />
-        <path d={paths.at} className={styles.lineAt} />
-
-        {ends.map((e) => (
-          <text key={e.cls} x={m.l + pw + 10} y={e.y} className={e.cls}>
-            {gbp(e.v)}
-          </text>
-        ))}
+        {/* Keyed by strategy: a new strategy remounts the group and the lines draw again. */}
+        <g key={animateKey} className={inView ? styles.live : undefined}>
+          <path d={paths.gap} className={styles.gap} />
+          {hold && <path d={paths.hold} className={styles.hold} />}
+          <path d={paths.no} pathLength={1} className={styles.lineNo} />
+          <path d={paths.at} pathLength={1} className={styles.lineAt} />
+          <g className={styles.ends}>
+            {ends.map((e) => (
+              <text key={e.cls} x={m.l + pw + 10} y={e.y} className={e.cls}>
+                {gbp(e.v)}
+              </text>
+            ))}
+          </g>
+        </g>
 
         {months.map((mo, i) => {
           const xa = X(Math.max(mo.start, x0));

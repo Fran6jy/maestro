@@ -26,7 +26,7 @@
 
 .axisStart {
   fill: var(--ink);
-  font: 600 11px var(--font-mono), monospace;
+  font: 500 11px var(--font-mono), monospace;
 }
 
 .gap {
@@ -59,7 +59,7 @@
 .endNo,
 .endAt,
 .endHold {
-  font: 600 12px var(--font-mono), monospace;
+  font: 500 12px var(--font-mono), monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -119,7 +119,40 @@
 }
 
 .tipDate {
-  color: var(--ink-3);
+  color: var(--ink-2);
+}
+
+/* ── Draw-in: no-cost line first, then the at-cost line, then the gap between them ── */
+@media (prefers-reduced-motion: no-preference) {
+  .live .lineNo,
+  .live .lineAt {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: draw 1.5s cubic-bezier(0.45, 0, 0.2, 1) forwards;
+  }
+
+  .live .lineAt {
+    animation-delay: 0.4s;
+  }
+
+  .live .gap,
+  .live .hold,
+  .live .ends {
+    opacity: 0;
+    animation: fade 0.7s ease forwards 1.5s;
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fade {
+  to {
+    opacity: 1;
+  }
 }
 
 .tipNo {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Logo from "./Logo";
 import styles from "./Nav.module.css";
@@ -16,6 +17,8 @@ const LINKS = [
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const current = (href: string) => (href === pathname ? "page" : undefined);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -40,7 +43,7 @@ export default function Nav() {
         <ul className={styles.links}>
           {LINKS.map((l) => (
             <li key={l.href}>
-              <Link href={l.href}>{l.label}</Link>
+              <Link href={l.href} aria-current={current(l.href)}>{l.label}</Link>
             </li>
           ))}
         </ul>
@@ -59,7 +62,7 @@ export default function Nav() {
         <ul>
           {LINKS.map((l) => (
             <li key={l.href}>
-              <Link href={l.href} onClick={() => setOpen(false)}>
+              <Link href={l.href} onClick={() => setOpen(false)} aria-current={current(l.href)}>
                 {l.label}
               </Link>
             </li>

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import Logo from "./Logo";
+import { RESULTS } from "@/lib/data";
 import styles from "./Footer.module.css";
+
+const PERIOD = `${RESULTS.months[0].label} to ${RESULTS.months[RESULTS.months.length - 1].label}`;
 
 const REPO = "https://github.com/Fran6jy/maestro";
 
@@ -37,9 +40,10 @@ export default function Footer() {
       </div>
       <div className={`shell ${styles.base}`}>
         <p>
-          Research, not investment advice. Every result here comes from historical simulation. No real money was traded.
+          Research, not investment advice. The results here come from historical simulation and a
+          practice account with pretend money. No real money is traded.
         </p>
-        <p className="mono">EUR/USD · 5-minute bars · Jan 2023 to Mar 2026</p>
+        <p className="mono">EUR/USD · 5-minute bars · {PERIOD}</p>
       </div>
     </footer>
   );

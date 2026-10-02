@@ -188,6 +188,7 @@ export default function StrategyLab() {
               months={MONTHS}
               monthNet={series.monthNet}
               costLabel={costLabel}
+              animateKey={key}
               title={`£10,000 traded with ${s.label}: ${gbp(endNo)} with no costs, ${gbp(endAt)} at ${costLabel} per trade.`}
             />
             <p className={styles.stripNote}>

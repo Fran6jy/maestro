@@ -52,7 +52,8 @@
   text-decoration: none;
 }
 
-.toc a:hover {
+.toc a:hover,
+.toc a[aria-current] {
   color: var(--ink);
   border-left-color: var(--amber);
 }
