@@ -124,7 +124,21 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
   `FRED_API_KEY`). Never commit data to this public repo.
 - **Features**: `C:\tmp\maestro_data\EUR_USD[_H1|_H4|_D]_features.parquet`, rebuilt by `store sync`.
 - **Outputs**: `C:\tmp\maestro_outputs\maestro\<design>\` (tags such as `refit3_roll12_fast`,
-  `H1_refit3_roll12_fast`).
+  `H1_refit3_roll12_fast`). Research runs keep each block's forecasts (`block_NN.parquet`) and its
+  settings (`block_NN.json`), not the trained models: a model is trained, forecasts its test
+  months and is discarded, and any block can be retrained from its settings.
+- **Live models**: the only saved models. `live.deploy` writes one to
+  `C:\tmp\maestro_live\models\<name>\` (regime, signal, `meta.json`, seed forecasts); a copy goes to
+  the server's `state/models/<name>/`, and the `current` link there picks the one in use.
+- **Backups**: the research outputs and live models exist only on the laptop, so they are copied to
+  the server as `~/maestro-backup/outputs-<date>.tar.gz` after each big run:
+  ```bash
+  cd C:/tmp && tar czf - maestro_outputs maestro_live/models | ssh <server> "cat > ~/maestro-backup/outputs-$(date +%F).tar.gz"
+  ```
+  First backup 2 Oct 2026 (129 MB, 1,781 files). Code is on GitHub, data in `maestro-data`, the live
+  trial on the server and in `maestro-live`, so nothing else is laptop-only except three secrets:
+  the server's SSH key (keep a copy in a password manager; without it, recover through Oracle's
+  console), `.env` (reissue from OANDA and FRED) and the Kaggle token (reissue on Kaggle).
 - **Compute**: laptop RTX 3070 Ti (about 12 minutes per block), or Kaggle's free T4 ×2 (about 30
   GPU-hours a week) through `cloud/kaggle/` (token in `~/.kaggle/access_token`; private dataset
   `fran6jy/maestro-raw`). **Do not use Modal** (no budget; September went over the free credit).

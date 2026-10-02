@@ -175,6 +175,11 @@ The 20-year run is 81 retraining blocks of 10–15 minutes each on a laptop RTX 
 is saved as it finishes, so a run can stop and resume, and blocks can be split across machines
 (`--shard`, `--reverse`). `cloud/kaggle/` runs the same blocks on Kaggle's free GPUs.
 
+A block saves its forecasts and settings, not its model: each model is trained, forecasts its test
+months and is discarded, so results take megabytes rather than gigabytes and any block can be
+retrained from its settings. The one model that is kept is the live trial's, written by
+`python -m maestro.live.deploy`. Outputs and models are not in the repository.
+
 The methodology is documented in full on the site's
 [method page](https://maestro-research.vercel.app/method) and in
 [`docs/THESIS_NARRATIVE.md`](docs/THESIS_NARRATIVE.md).
