@@ -79,9 +79,10 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
    −2.50 (£1,780 vs £1,569 from £10,000), every signal −2.23 vs −2.51, cost check −0.70 vs −0.89
    (£6,467 vs £6,061, 80 vs 74 months profitable). Paired daily returns, monthly minus quarterly:
    t = +0.70 (top 10%), +1.91 (every signal), +0.45 (cost check). Hit rates move by 0.1 points.
-   Nothing becomes profitable; Bollinger (−0.30) still beats every MAESTRO version. Recommendation:
-   **freeze the quarterly design** (three times cheaper to run live, same conclusion), awaiting
-   confirmation.
+   Nothing becomes profitable; Bollinger (−0.30) still beats every MAESTRO version.
+   **Design frozen 2 Oct 2026: quarterly retraining on the latest 12 months, 5-minute bars, fast
+   TFT settings (`refit3_roll12_fast`), the four MAESTRO variants scored as they stand.** Nothing
+   in MAESTRO is tuned or changed after this point.
 3. Freeze the design; run the sealed holdout once (`--holdout`).
 4. Regenerate the live expectations from the frozen design and commit them *before* the trial
    (`python -m maestro.live.expectations`): they are the trial's published prediction.
