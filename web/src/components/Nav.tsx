@@ -11,6 +11,7 @@ const LINKS = [
   { href: "/#msc", label: "The MSc" },
   { href: "/#agents", label: "The agents" },
   { href: "/#roadmap", label: "Roadmap" },
+  { href: "/live", label: "Live trial" },
   { href: "/method", label: "Method" },
 ];
 

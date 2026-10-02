@@ -95,8 +95,9 @@ backtest. It runs in one Docker container on a small always-on server (`deploy/l
 - Every night a snapshot (returns, pips, fills, health; no prices) is published to a public
   record, checked automatically, and shown on the site's live page.
 
-Status: paper-only shakedown since 30 September 2026. The trial proper starts once the corrected
-MAESTRO results fix which variant trades and the holdout confirmation has run.
+Status: the trial proper started on 2 October 2026 with the frozen design, after the sealed test;
+practice orders come from MAESTRO's top-10% version. Follow it on the site's
+[live page](https://maestro-research.vercel.app/live), updated every night.
 
 ## Status
 
@@ -110,7 +111,7 @@ MAESTRO results fix which variant trades and the holdout confirmation has run.
 | Horizon sweep (1-hour, 4-hour, daily bars) | Done: slower bars don't help; no result distinguishable from luck |
 | Monthly vs quarterly retraining | Done: monthly helps a little, not significantly; nothing becomes profitable |
 | Final test on sealed data, 7 Mar to 2 Oct 2026 | Done: same answer; every strategy inside its pre-registered range |
-| Live trial on an OANDA **practice** account | Paper shakedown running |
+| Live trial on an OANDA **practice** account | Running since 2 Oct 2026; practice orders from the top-10% version |
 | Cross-asset extension (gold, S&P 500) | Later |
 
 ## How MAESTRO works

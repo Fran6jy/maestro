@@ -26,6 +26,7 @@ export default function Footer() {
               <li><Link href="/#msc">The MSc, re-examined</Link></li>
               <li><Link href="/#agents">The agents</Link></li>
               <li><Link href="/#roadmap">Roadmap</Link></li>
+              <li><Link href="/live">Live trial</Link></li>
             </ul>
           </div>
           <div>

@@ -21,9 +21,9 @@ services:
       OANDA_ENVIRONMENT: practice
     volumes:
       - ./state:/state
-    # Paper-trades every strategy. Add "--orders <strategy>" once the frozen design names
-    # the one MAESTRO variant that also trades on the practice account.
-    command: []
+    # Paper-trades every strategy and sends the top-10% variant's positions to the practice
+    # account (chosen 2 Oct 2026; see docs/DECISIONS.md). An empty list is paper only.
+    command: ["--orders", "maestro_top10"]
     mem_limit: 4g
     cpus: 2.0
     logging:
@@ -41,7 +41,7 @@ services:
     restart: unless-stopped
     depends_on: [maestro-live]
     environment:
-      MAESTRO_LIVE_PHASE: ${MAESTRO_LIVE_PHASE:-shakedown}
+      MAESTRO_LIVE_PHASE: ${MAESTRO_LIVE_PHASE:-trial}
     volumes:
       - ./state:/state
       - ./publish:/publish

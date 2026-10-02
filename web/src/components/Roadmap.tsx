@@ -22,9 +22,9 @@ const ITEMS = [
     body: "Same months, costs and scoring code. MAESTRO calls 53–54% of moves right, the best of any strategy, but earns about a third of a trade's cost, so it loses money too. Re-run after a look-ahead bug fix, which barely changed it.",
   },
   {
-    status: ["pill-next", "Shakedown"],
+    status: ["pill-next", "Running"],
     title: "Live practice trial",
-    body: "MAESTRO and the MSc strategies trade side by side on every 5-minute bar, paper-traded at live OANDA prices, and one MAESTRO version will also place orders on a practice account. Running as a paper-only shakedown now; the trial proper starts next. No real money.",
+    body: "Since 2 October 2026, MAESTRO and the MSc strategies trade side by side on every 5-minute bar, paper-traded at live OANDA prices, and MAESTRO's top-10% version also places orders on a practice account. Judged against ranges published before it started. No real money.",
   },
   {
     status: ["pill-later", "Later"],

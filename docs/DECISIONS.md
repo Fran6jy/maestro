@@ -107,6 +107,14 @@ until the one confirmation run below. Commits are by the author alone.
   logistic regression −£1,839 against [−2,999, −1,152]. Conclusion confirmed on data no
   decision touched: MAESTRO's accuracy is real and too small for the costs. Decision: none
   (none allowed); the trial proceeds with the top-10% variant on practice orders.
+- **Live trial started** at about 20:57 UTC, on the author's instruction. Model
+  `trial-2026-10-02`: the frozen design trained on 28 Sep 2025 to 25 Sep 2026 (five-day embargo
+  before the newest bar), code `5697ba7`, fast settings, TFT stopped at epoch 15. Practice orders
+  from `maestro_top10` at 10,000 units per unit of position; every other strategy paper-traded.
+  The shakedown's journal (30 Sep to 2 Oct) was archived as `journal-shakedown.db` so the trial
+  starts clean at £10,000 for every strategy; its snapshots remain in `maestro-live/history/`.
+  FX was closed for the weekend, so the first trial bar is Sunday 4 October at 22:00 UTC. The
+  live page was listed in the site's menu and opened to search engines the same evening.
 
 ## Standing rules
 

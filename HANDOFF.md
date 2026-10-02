@@ -88,7 +88,8 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
    --out C:/tmp/maestro_outputs_holdout/maestro/refit3_roll12_fast`, then `risk_layer ... --holdout
    --design <same>`). Result in `docs/DECISIONS.md` and `web/src/data/holdout.json`.
 4. ~~Regenerate the live expectations~~ committed as `e8b067d` before the holdout was opened.
-5. The practice-order variant is decided (2 Oct 2026): **`maestro_top10`**, about 6 trades a day.
+5. ~~Start the trial~~ done 2 Oct 2026 20:57 UTC (see Live trial below). The practice-order
+   variant is **`maestro_top10`**, about 6 trades a day.
    The cost check (`risk_cost_filter`) was the first choice but trades in bursts: whole quarters
    with no trades (2021 Q1, 2025 Q1), 28 qualifying bars in 2026 Q1, and none in the shakedown's
    first 1.5 days (largest live forecast 0.67 pips against its 1.3-pip bar). Practice orders exist
@@ -102,8 +103,14 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
 - Runs in Docker on a private always-on ARM server (details kept outside this public repo). Its
   folder `~/maestro-live` holds `Dockerfile`, `docker-compose.yml`, a `.env` with only the four
   trial settings, and `state/` (models, `journal.db`, `status.json`, `live.log`).
-- Paper-only shakedown since 30 Sep 2026 with the model `state/models/shakedown-2026-09-30`.
-  No practice orders are sent until a variant is chosen and confirmed.
+- **Trial proper since 2 Oct 2026 20:57 UTC** with the model `state/models/trial-2026-10-02`
+  (frozen design, trained to 25 Sep 2026, code `5697ba7`), practice orders from `maestro_top10`
+  at 10,000 units, `MAESTRO_LIVE_PHASE=trial`. First trading bar Sunday 4 Oct 22:00 UTC. The
+  shakedown (30 Sep to 2 Oct, model `shakedown-2026-09-30`) is archived in `state/` as
+  `journal-shakedown.db`, `live-shakedown.log`, `status-shakedown.json`.
+- Weekly check-in during the trial: `docker exec maestro-live python -m maestro.live.report`,
+  the live page, and the `maestro-live` Actions tab. Watch the orders table for failed orders
+  and the gap between quoted and reference costs.
 - Update the model: `python -m maestro.live.deploy --out <dir>` on the laptop, copy the folder to
   `state/models/`, point `state/models/current` at it, then `docker compose restart`.
 - Watch: `docker exec maestro-live python -m maestro.live.report` (health, every strategy in pips,
