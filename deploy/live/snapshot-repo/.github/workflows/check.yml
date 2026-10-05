@@ -1,11 +1,13 @@
-# Checks the MAESTRO live trial every night and after every snapshot.
+# Checks the MAESTRO live trial after each Foundation edition and on a matching schedule.
 # A stale snapshot, a stopped loop, a loop error or missed bars fail the run,
 # and GitHub emails the owner. The code comes from the public Fran6jy/maestro repo.
 name: Check the live trial
 
 on:
   schedule:
-    - cron: "0 3 * * *"        # 03:00 UTC, well after the 00:20 publish
+    - cron: "0 2 * * *"        # after Dawn
+    - cron: "0 14 * * *"       # after Day
+    - cron: "0 22 * * *"       # after Dusk
   push:
     paths: [snapshot.json]
   workflow_dispatch:

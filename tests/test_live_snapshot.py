@@ -11,8 +11,10 @@ import pandas as pd
 import pytest
 
 from maestro.backtesting.baselines import _net_log, simulate, summarise
+from maestro.live import publish as publisher
 from maestro.live.check import problems
 from maestro.live.ledger import Journal
+from maestro.live.publish import current_edition, next_run
 from maestro.live.snapshot import build
 
 PIP = 1e-4
@@ -59,6 +61,55 @@ def test_cutoff_keeps_whole_days_only(state):
     snap = build(path, "trial", now=close.index[-1] + pd.Timedelta(minutes=6), cutoff=cut)
     assert pd.Timestamp(snap["last_bar"]) < cut
     assert snap["days"][-1] < cut.strftime("%Y-%m-%d")
+
+
+def test_foundation_schedule():
+    dawn = pd.Timestamp("2026-10-05 00:20", tz="UTC")
+    assert next_run(pd.Timestamp("2026-10-05 00:19", tz="UTC")) == (dawn, "dawn")
+    assert next_run(dawn) == (pd.Timestamp("2026-10-05 12:20", tz="UTC"), "day")
+    assert next_run(pd.Timestamp("2026-10-05 21:00", tz="UTC")) == (
+        pd.Timestamp("2026-10-06 00:20", tz="UTC"), "dawn")
+    assert current_edition(pd.Timestamp("2026-10-05 08:00", tz="UTC")) == "dawn"
+    assert current_edition(pd.Timestamp("2026-10-05 15:00", tz="UTC")) == "day"
+    assert current_edition(pd.Timestamp("2026-10-05 23:00", tz="UTC")) == "dusk"
+
+
+def test_foundation_metadata_is_explicit(state):
+    path, close, _ = state
+    snap = build(path, "trial", now=close.index[-1], edition="day", official=False)
+    assert snap["edition"] == "day"
+    assert snap["official"] is False
+
+
+def test_foundation_publication_keeps_official_and_provisional_separate(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(publisher, "checkout", lambda *args: None)
+    monkeypatch.setattr(publisher, "build", lambda state, phase, now, cutoff, edition, official: {
+        "generated_at": now.isoformat(), "cutoff": cutoff.isoformat() if cutoff is not None else None,
+        "edition": edition, "official": official,
+    })
+
+    def fake_git(work, *args, key):
+        calls.append(args)
+        return "changed" if args[0] == "status" else ""
+
+    monkeypatch.setattr(publisher, "git", fake_git)
+    common = (tmp_path, "trial", "repo", tmp_path / "public", tmp_path / "key")
+    common[3].mkdir()
+    dawn = pd.Timestamp("2026-10-06 00:20", tz="UTC")
+    publisher.publish(*common, edition="dawn", now=dawn)
+    public = tmp_path / "public"
+    assert (public / "official.json").exists()
+    assert (public / "history" / "2026-10-05.json").exists()
+    assert (public / "history" / "foundation" / "2026-10-05-dawn.json").exists()
+
+    day = pd.Timestamp("2026-10-06 12:20", tz="UTC")
+    publisher.publish(*common, edition="day", now=day)
+    assert json.loads((public / "snapshot.json").read_text())["edition"] == "day"
+    assert json.loads((public / "official.json").read_text())["edition"] == "dawn"
+    assert (public / "history" / "foundation" / "2026-10-06-day.json").exists()
+    assert publisher.publish(*common, edition="day", now=day).endswith("already published")
+    assert any(args[0] == "push" for args in calls)
 
 
 def test_snapshot_never_carries_prices(state):

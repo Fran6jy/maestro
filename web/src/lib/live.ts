@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import expectations from "@/data/live_expectations.json";
 
-/** One strategy in the nightly snapshot (live/snapshot.py documents every field). */
+/** One strategy in a Foundation snapshot (live/snapshot.py documents every field). */
 export interface LiveStrategy {
   daily: { gross: number[]; ref: number[]; quoted: number[] };   // daily log returns
   trades: number;
@@ -36,9 +36,12 @@ export interface LiveOrder {
 
 export interface Snapshot {
   generated_at: string;
+  edition?: "dawn" | "day" | "dusk" | null;
+  official?: boolean | null;
   phase: "shakedown" | "trial";
   ref_cost_pips: number;
   start_gbp: number;
+  cutoff?: string | null;
   code_commit: string | null;
   model: { deployed_at?: string; train_start?: string; train_end?: string; commit?: string };
   order_strategy: string | null;
@@ -93,12 +96,13 @@ export const EXPECT = expectations as unknown as Expectations;
 /** Where the published snapshots live once the trial is public. */
 export const LIVE_REPO = "https://github.com/Fran6jy/maestro-live";
 export const SNAPSHOT_URL = "https://raw.githubusercontent.com/Fran6jy/maestro-live/main/snapshot.json";
+export const OFFICIAL_SNAPSHOT_URL = "https://raw.githubusercontent.com/Fran6jy/maestro-live/main/official.json";
 
 /** The page is public only when LIVE_PUBLIC=1; before that it exists for local preview. */
 export const LIVE_PUBLIC = process.env.LIVE_PUBLIC === "1";
 
 /**
- * The latest snapshot: from the public repository (refreshed hourly), or for a local
+ * The latest snapshot: from the public repository (refreshed every five minutes), or for a local
  * preview from LIVE_SNAPSHOT_FILE. Null when neither is available.
  */
 export async function getSnapshot(): Promise<Snapshot | null> {
@@ -112,7 +116,27 @@ export async function getSnapshot(): Promise<Snapshot | null> {
   }
   if (!LIVE_PUBLIC) return null;
   try {
-    const res = await fetch(SNAPSHOT_URL, { next: { revalidate: 3600 } });
+    const res = await fetch(SNAPSHOT_URL, { next: { revalidate: 300 } });
+    return res.ok ? ((await res.json()) as Snapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Latest official Dawn close. It deliberately excludes the current partial UTC day. */
+export async function getOfficialSnapshot(): Promise<Snapshot | null> {
+  const file = process.env.LIVE_SNAPSHOT_FILE;
+  if (file) {
+    try {
+      const snap = JSON.parse(await readFile(file, "utf-8")) as Snapshot;
+      return snap.official === false ? null : snap;
+    } catch {
+      return null;
+    }
+  }
+  if (!LIVE_PUBLIC) return null;
+  try {
+    const res = await fetch(OFFICIAL_SNAPSHOT_URL, { next: { revalidate: 300 } });
     return res.ok ? ((await res.json()) as Snapshot) : null;
   } catch {
     return null;

@@ -200,7 +200,8 @@ def _code_commit() -> str | None:
         return None
 
 
-def build(state: Path, phase: str, now: pd.Timestamp | None = None, cutoff: pd.Timestamp | None = None) -> dict:
+def build(state: Path, phase: str, now: pd.Timestamp | None = None, cutoff: pd.Timestamp | None = None,
+          edition: str | None = None, official: bool | None = None) -> dict:
     """The snapshot as of `now`, counting bars before `cutoff` only (default: all of them)."""
     now = now or pd.Timestamp.now(tz="UTC")
     db = _connect(state / "journal.db")
@@ -213,6 +214,8 @@ def build(state: Path, phase: str, now: pd.Timestamp | None = None, cutoff: pd.T
 
     out = {
         "generated_at": now.isoformat(timespec="seconds"),
+        "edition": edition,
+        "official": official,
         "phase": phase,
         "ref_cost_pips": REF_COST_PIPS,
         "start_gbp": START_GBP,

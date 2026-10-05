@@ -101,6 +101,124 @@
   color: var(--ink-2);
 }
 
+/* ── Foundation reporting cycle ───────────────────────── */
+.foundation {
+  padding: clamp(20px, 3vw, 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.foundationHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.foundationHead h2 {
+  margin-top: 4px;
+  font-size: var(--fs-lg);
+}
+
+.foundationHead p:not(.eyebrow),
+.foundationNote {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.refresh {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  padding: 9px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.refresh:hover,
+.refresh:focus-visible {
+  border-color: var(--accent);
+}
+
+.refresh:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.foundationSteps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.foundationSteps li {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 3px;
+}
+
+.foundationSteps span {
+  font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.foundationSteps strong,
+.foundationSteps small {
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+}
+
+.foundationActive {
+  border-color: var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.periodSection {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.periodCards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.periodCard {
+  padding: 18px 20px;
+  display: grid;
+  gap: 5px;
+}
+
+.periodCard p,
+.periodCard small {
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+
+.periodCard strong {
+  font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-size: var(--fs-xl);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
 /* ── Balance cards ─────────────────────────────────────── */
 .cards {
   display: grid;
@@ -515,6 +633,15 @@
 
   .facts a {
     text-align: left;
+  }
+
+  .foundationHead {
+    flex-direction: column;
+  }
+
+  .foundationSteps,
+  .periodCards {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

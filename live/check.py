@@ -21,7 +21,7 @@ import pandas as pd
 
 from maestro.data.pipeline.store import market_closed
 
-MAX_SNAPSHOT_AGE = pd.Timedelta(hours=26)    # nightly, with slack
+MAX_SNAPSHOT_AGE = pd.Timedelta(hours=10)    # Foundation editions are at most eight hours apart
 MAX_HEARTBEAT_AGE = pd.Timedelta(minutes=30)
 MAX_MISSED_SHARE = 0.02
 

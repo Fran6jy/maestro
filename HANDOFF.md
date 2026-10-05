@@ -115,9 +115,11 @@ Bugs found and fixed so far (they belong in the thesis methods chapter):
   `state/models/`, point `state/models/current` at it, then `docker compose restart`.
 - Watch: `docker exec maestro-live python -m maestro.live.report` (health, every strategy in pips,
   practice fills), `cat state/status.json` or `docker compose logs -f`.
-- Nightly snapshot: `maestro-publish` pushes `live/snapshot.py`'s output to the `maestro-live`
-  repository at 00:20 UTC; that repository's Action runs `live/check.py` and emails on failure.
-  The live page (`web/src/app/live/`) reads it and stays a 404 until `LIVE_PUBLIC=1` on Vercel.
+- Foundation snapshots: `maestro-publish` pushes `live/snapshot.py`'s output to `maestro-live`
+  at 00:20, 12:20 and 20:20 UTC. Dawn is the official whole-day close; Day and Dusk are
+  provisional. That repository's Action runs `live/check.py` and emails on failure.
+  The live page (`web/src/app/live/`) reads the latest plus `official.json`, shows Today/Week/
+  Month/All time, and stays a 404 until `LIVE_PUBLIC=1` on Vercel.
   Preview it locally with `LIVE_SNAPSHOT_FILE=<snapshot.json>` in `web/.env.local` and `npm run dev`.
 - Live quoted spreads in the shakedown average about 0.8 pips, well under the 1.5-pip median of the
   candles' bid/ask since 2022; worth explaining in the thesis (quote source and timing differ).

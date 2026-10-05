@@ -116,6 +116,17 @@ until the one confirmation run below. Commits are by the author alone.
   FX was closed for the weekend, so the first trial bar is Sunday 4 October at 22:00 UTC. The
   live page was listed in the site's menu and opened to search engines the same evening.
 
+## 2026-10-05
+
+- **Foundation reporting added without changing the experiment.** The trading model, decisions,
+  orders, official UTC-day scoring and pre-registered historical ranges remain frozen. Public
+  observations are now published as Dawn (00:20 UTC, the immutable official close for the previous
+  whole UTC day), Day (12:20 UTC, provisional) and Dusk (20:20 UTC, provisional). Every edition is
+  preserved under `history/foundation/`; only Dawn updates `official.json` and the original
+  `history/<date>.json` record. Weekly, monthly and all-time returns use Dawn closes only. Decision:
+  provide a comprehensible public rhythm and operational visibility without creating extra research
+  endpoints or comparing partial days with full-day backtest ranges.
+
 ## Standing rules
 
 - A "no" is a valid result and is reported as plainly as a "yes".

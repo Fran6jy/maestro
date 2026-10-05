@@ -8,13 +8,15 @@ import {
   LIVE_REPO,
   balanceChange,
   balancePath,
+  getOfficialSnapshot,
   getSnapshot,
   placement,
   type Snapshot,
 } from "@/lib/live";
+import LiveRefresh from "./LiveRefresh";
 import styles from "./live.module.css";
 
-export const revalidate = 3600;
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "Live trial",
@@ -71,6 +73,97 @@ const PLACEMENT_TEXT = {
   high: "Above the middle of the usual range",
   above: "Better than 19 in 20 stretches of history",
 } as const;
+
+const FOUNDATION = {
+  dawn: { label: "Dawn", at: "00:20 UTC", note: "official daily close" },
+  day: { label: "Day", at: "12:20 UTC", note: "provisional midpoint" },
+  dusk: { label: "Dusk", at: "20:20 UTC", note: "provisional late view" },
+} as const;
+
+function editionOf(snap: Snapshot): keyof typeof FOUNDATION {
+  return snap.edition ?? "dawn";
+}
+
+function sumPeriod(snap: Snapshot, key: string, keep: (day: string) => boolean): number {
+  const daily = snap.strategies[key]?.daily.ref ?? [];
+  return snap.days.reduce((sum, day, i) => sum + (keep(day) ? (daily[i] ?? 0) : 0), 0);
+}
+
+function periodMoney(logReturn: number, start: number): number {
+  return start * (Math.exp(logReturn) - 1);
+}
+
+function mondayOf(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  const offset = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - offset);
+  return d.toISOString().slice(0, 10);
+}
+
+function FoundationCycle({ snap }: { snap: Snapshot }) {
+  const current = editionOf(snap);
+  const f = FOUNDATION[current];
+  return (
+    <section className={`panel ${styles.foundation}`} aria-labelledby="foundation-title">
+      <div className={styles.foundationHead}>
+        <div>
+          <p className={styles.eyebrow}>Foundation cycle</p>
+          <h2 id="foundation-title">{f.label}: {f.note}</h2>
+          <p>Published {longDate(snap.generated_at)} at {new Date(snap.generated_at).toISOString().slice(11, 16)} UTC.</p>
+        </div>
+        <LiveRefresh />
+      </div>
+      <ol className={styles.foundationSteps}>
+        {Object.entries(FOUNDATION).map(([key, item]) => (
+          <li key={key} className={key === current ? styles.foundationActive : ""}>
+            <span>{item.label}</span><strong>{item.at}</strong><small>{item.note}</small>
+          </li>
+        ))}
+      </ol>
+      <p className={styles.foundationNote}>
+        Day and Dusk are observations while trading continues. Only Dawn becomes the official daily
+        research record. This page checks for a newer observation every five minutes while open.
+      </p>
+    </section>
+  );
+}
+
+function PeriodReturns({ latest, official, strategy, start }:
+  { latest: Snapshot; official: Snapshot; strategy: string; start: number }) {
+  const asOf = latest.generated_at.slice(0, 10);
+  const week = mondayOf(asOf);
+  const month = asOf.slice(0, 7);
+  const todayLog = latest.days.at(-1) === asOf
+    ? (latest.strategies[strategy]?.daily.ref.at(-1) ?? 0) : 0;
+  const values = [
+    ["Today", periodMoney(todayLog, start), latest.official === false ? "provisional" : "not started"],
+    ["This week", periodMoney(sumPeriod(official, strategy, (d) => d >= week && d <= asOf), start), "Dawn closes"],
+    ["This month", periodMoney(sumPeriod(official, strategy, (d) => d.startsWith(month)), start), "Dawn closes"],
+    ["All time", periodMoney(sumPeriod(official, strategy, () => true), start), "Dawn closes"],
+  ] as const;
+  return (
+    <section className={styles.periodSection} aria-labelledby="returns-period">
+      <div className={styles.sectionHead}>
+        <h2 id="returns-period">Returns through four windows</h2>
+        <p className="lede">
+          {label(strategy)}. Today follows the latest observation; week, month and all time use only
+          immutable Dawn closes.
+        </p>
+      </div>
+      <div className={styles.periodCards}>
+        {values.map(([name, value, basis]) => (
+          <div className={`panel ${styles.periodCard}`} key={name}>
+            <p>{name}</p>
+            <strong className={value > 0.004 ? styles.gain : value < -0.004 ? styles.loss : styles.flat}>
+              {money(value)}
+            </strong>
+            <small>{basis}</small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 // ── The called shot: backtest range against the live path ─────────────────────
 function RangeChart({ snap, k, start, hero = false }: { snap: Snapshot; k: string; start: number; hero?: boolean }) {
@@ -155,8 +248,9 @@ function NotStarted() {
 
 export default async function LivePage() {
   if (!LIVE_PUBLIC && !process.env.LIVE_SNAPSHOT_FILE) notFound();
-  const snap = await getSnapshot();
+  const [snap, officialLoaded] = await Promise.all([getSnapshot(), getOfficialSnapshot()]);
   if (!snap || !snap.start || !snap.days.length) return <NotStarted />;
+  const official = officialLoaded ?? snap;
 
   const start = snap.start_gbp ?? EXPECT.start_balance;
   const maestroKey = snap.order_strategy ?? DEFAULT_MAESTRO;
@@ -201,6 +295,10 @@ export default async function LivePage() {
           <RangeChart snap={snap} k={maestroKey} start={start} hero />
         </div>
       </header>
+
+      <FoundationCycle snap={snap} />
+
+      <PeriodReturns latest={snap} official={official} strategy={maestroKey} start={start} />
 
       {/* 1. Balances */}
       <section className={styles.section} aria-labelledby="balances">

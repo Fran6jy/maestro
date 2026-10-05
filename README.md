@@ -92,8 +92,9 @@ backtest. It runs in one Docker container on a small always-on server (`deploy/l
 - `live/oanda.py` can only reach OANDA's practice server and never resends an order.
 - Before the trial starts, the 20-year backtest's expected range for every strategy over 1–65 days
   is committed (`web/src/data/live_expectations.json`); the live results are judged against it.
-- Every night a snapshot (returns, pips, fills, health; no prices) is published to a public
-  record, checked automatically, and shown on the site's live page.
+- Dawn, Day and Dusk snapshots (returns, pips, fills, health; no prices) are published at
+  00:20, 12:20 and 20:20 UTC. Dawn is the immutable official daily close; Day and Dusk are
+  provisional observations. The site shows today, week, month and all-time performance.
 
 Status: the trial proper started on 2 October 2026 with the frozen design, after the sealed test;
 practice orders come from MAESTRO's top-10% version. Follow it on the site's

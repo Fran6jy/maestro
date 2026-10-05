@@ -41,15 +41,16 @@ or an order.
 docker exec maestro-live python -m maestro.live.report     # health, every strategy in pips, orders
 ```
 
-## Nightly snapshot
+## Foundation snapshots
 
-`maestro-publish` builds a snapshot from the journal at 00:20 UTC (`live/snapshot.py`:
-daily returns, pips, trades, practice fills against paper, bars recorded against bars
-the market was open; never prices) and pushes it to the `Fran6jy/maestro-live`
-repository as `snapshot.json` plus `history/<date>.json`. The website's live page
-reads `snapshot.json`; a GitHub Action in that repository runs `live/check.py` after
-every snapshot and every night, and fails (so GitHub emails the owner) if the
-snapshot is stale, the loop stopped or errored, or bars were missed.
+`maestro-publish` builds Dawn, Day and Dusk observations from the journal at 00:20,
+12:20 and 20:20 UTC (`live/snapshot.py`: returns, pips, trades, practice fills against
+paper, bars recorded against bars the market was open; never prices). Dawn closes the
+previous whole UTC day and is the official research result. Day and Dusk are provisional.
+All three are immutable under `history/foundation/`; `official.json` and the existing
+`history/<date>.json` paths contain only Dawn closes. A GitHub Action runs `live/check.py`
+after every publication and on a matching schedule, and emails the owner if a snapshot
+is stale, the loop stopped or errored, or bars were missed.
 
 Once:
 

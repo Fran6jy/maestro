@@ -32,8 +32,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Publishes the nightly snapshot (live/snapshot.py) to the snapshot repository at
-  # 00:20 UTC. Reads the journal read-only; its one secret is ./keys/maestro_live, a
+  # Publishes Foundation snapshots (live/snapshot.py) at 00:20, 12:20 and 20:20 UTC.
+  # Dawn is the official daily close; Day and Dusk are provisional. Reads the journal
+  # read-only; its one secret is ./keys/maestro_live, a
   # deploy key that can write to that repository and nothing else.
   maestro-publish:
     image: maestro-live:local
