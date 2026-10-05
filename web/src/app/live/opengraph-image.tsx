@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { EXPECT, balanceChange, balancePath, getSnapshot } from "@/lib/live";
+import { EXPECT, balanceChange, balancePath, getSnapshot, trialDayNumber } from "@/lib/live";
 
 export const alt = "MAESTRO live trial: four strategies trading EUR/USD with £10,000 of pretend money each.";
 export const size = { width: 1200, height: 630 };
@@ -24,7 +24,7 @@ export default async function Image() {
   const keys = ready
     ? [maestro, ...FEATURED.filter((k) => k !== maestro)].filter((k) => snap!.strategies[k]).slice(0, 4)
     : [];
-  const n = snap?.days.length ?? 0;
+  const n = snap ? trialDayNumber(snap) : 0;
 
   // MAESTRO's predicted range and live line, faint, across the bottom of the card.
   const exp = EXPECT.strategies[maestro];

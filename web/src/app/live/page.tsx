@@ -11,6 +11,7 @@ import {
   getOfficialSnapshot,
   getSnapshot,
   placement,
+  trialDayNumber,
   type Snapshot,
 } from "@/lib/live";
 import LiveRefresh from "./LiveRefresh";
@@ -258,6 +259,7 @@ export default async function LivePage() {
   const all = Object.keys(snap.strategies).sort((a, b) =>
     balanceChange(snap.strategies[b].daily.ref, start) - balanceChange(snap.strategies[a].daily.ref, start));
   const n = snap.days.length;
+  const trialDay = trialDayNumber(snap);
   const dayIdx = Math.min(n, EXPECT.horizon_days) - 1;
   const m = snap.strategies[maestroKey];
   const storyKey = m && m.trades > 0 ? maestroKey : "logreg_lag5";
@@ -278,7 +280,7 @@ export default async function LivePage() {
               {snap.phase === "trial" ? "Running" : "Shakedown"}
             </span>
           </div>
-          <h1>Day {n}: where the pretend money stands</h1>
+          <h1>Day {trialDay}: where the pretend money stands</h1>
           <p className="lede">
             On {longDate(snap.start)} each strategy got <strong>£10,000 of pretend money</strong>. Every five
             minutes, each one decides whether to bet on the euro rising or falling against the dollar, at

@@ -143,6 +143,22 @@ export async function getOfficialSnapshot(): Promise<Snapshot | null> {
   }
 }
 
+/**
+ * Human-facing trial day. The run began shortly before midnight, so counting
+ * entries in `days` would turn that short opening window into a whole day.
+ * Published observations advance the label when their UTC calendar date moves
+ * beyond the start date; the first date after launch is Trial Day 1.
+ */
+export function trialDayNumber(snap: Pick<Snapshot, "start" | "generated_at">): number {
+  if (!snap.start) return 1;
+  const start = new Date(snap.start);
+  const observed = new Date(snap.generated_at);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(observed.getTime())) return 1;
+  const startDay = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate());
+  const observedDay = Date.UTC(observed.getUTCFullYear(), observed.getUTCMonth(), observed.getUTCDate());
+  return Math.max(1, Math.floor((observedDay - startDay) / 86_400_000));
+}
+
 /** Balance change in £ after each day, from daily log returns. */
 export function balancePath(daily: number[], start: number): number[] {
   let acc = 0;
