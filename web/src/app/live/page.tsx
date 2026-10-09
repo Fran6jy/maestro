@@ -64,6 +64,7 @@ function longDate(iso: string): string {
 }
 
 function label(key: string): string {
+  if (key === "maestro_gated") return "MAESTRO, original confidence gate";
   return EXPECT.strategies[key]?.label ?? key;
 }
 
@@ -99,6 +100,18 @@ function mondayOf(iso: string): string {
   const offset = (d.getUTCDay() + 6) % 7;
   d.setUTCDate(d.getUTCDate() - offset);
   return d.toISOString().slice(0, 10);
+}
+
+function observationLabel(snap: Snapshot): string {
+  const edition = editionOf(snap);
+  return edition === "dawn" ? "Official Dawn close" : `${FOUNDATION[edition].label} observation`;
+}
+
+function nextObservation(snap: Snapshot): string {
+  const edition = editionOf(snap);
+  if (edition === "dawn") return "Day at 12:20 UTC";
+  if (edition === "day") return "Dusk at 20:20 UTC";
+  return "Dawn at 00:20 UTC";
 }
 
 function FoundationCycle({ snap }: { snap: Snapshot }) {
@@ -222,12 +235,88 @@ function RangeChart({ snap, k, start, hero = false }: { snap: Snapshot; k: strin
 }
 
 /** The expert layer's toggle: a real control, with its label following its state. */
-function NumbersToggle() {
+function NumbersToggle({ show = "Show the numbers", hide = "Hide the numbers" }:
+  { show?: string; hide?: string }) {
   return (
     <summary>
-      <span className={styles.showLabel}>Show the numbers</span>
-      <span className={styles.hideLabel}>Hide the numbers</span>
+      <span className={styles.showLabel}>{show}</span>
+      <span className={styles.hideLabel}>{hide}</span>
     </summary>
+  );
+}
+
+function LiveSummary({ latest, official, all, maestroKey, start }:
+  { latest: Snapshot; official: Snapshot; all: string[]; maestroKey: string; start: number }) {
+  const leader = all.find((k) => latest.strategies[k].trades > 0) ?? all[0];
+  const maestroRank = Math.max(1, all.indexOf(maestroKey) + 1);
+  const maestroNow = balanceChange(latest.strategies[maestroKey].daily.ref, start);
+  const maestroDawn = official.strategies[maestroKey]
+    ? balanceChange(official.strategies[maestroKey].daily.ref, start) : maestroNow;
+  const sinceDawn = maestroNow - maestroDawn;
+  const leaderReturn = balanceChange(latest.strategies[leader].daily.ref, start);
+  return (
+    <section className={styles.liveSummary} aria-labelledby="right-now">
+      <div className={styles.summaryHeading}>
+        <div>
+          <p className={styles.eyebrow}>Right now</p>
+          <h2 id="right-now">The trial at a glance</h2>
+        </div>
+        <p>{observationLabel(latest)} · {new Date(latest.generated_at).toISOString().slice(11, 16)} UTC</p>
+      </div>
+      <div className={styles.summaryGrid}>
+        <div className={`panel ${styles.summaryCard}`}>
+          <span>Leading active strategy</span><strong>{label(leader)}</strong>
+          <small className={leaderReturn >= 0 ? styles.gain : styles.loss}>{money(leaderReturn)}</small>
+        </div>
+        <div className={`panel ${styles.summaryCard}`}>
+          <span>MAESTRO rank</span><strong>#{maestroRank} of {all.length}</strong>
+          <small>{money(maestroNow)} after fees</small>
+        </div>
+        <div className={`panel ${styles.summaryCard}`}>
+          <span>MAESTRO since Dawn</span><strong className={sinceDawn > 0.004 ? styles.gain : sinceDawn < -0.004 ? styles.loss : styles.flat}>{money(sinceDawn)}</strong>
+          <small>{latest.strategies[maestroKey].trades} trades in total</small>
+        </div>
+        <div className={`panel ${styles.summaryCard}`}>
+          <span>Next publication</span><strong>{nextObservation(latest)}</strong>
+          <small>Page checks every five minutes</small>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Leaderboard({ snap, official, all, maestroKey, start }:
+  { snap: Snapshot; official: Snapshot; all: string[]; maestroKey: string; start: number }) {
+  return (
+    <section className={styles.section} aria-labelledby="leaderboard">
+      <div className={styles.sectionHead}>
+        <p className={styles.eyebrow}>Every strategy</p>
+        <h2 id="leaderboard">Live leaderboard</h2>
+        <p className="lede">All strategies, ranked by return after the same reference fee. Strategies with no trades remain visible, but are not described as active leaders.</p>
+      </div>
+      <div className={`panel ${styles.leaderboardWrap}`}>
+        <table className={`${styles.table} ${styles.leaderboardTable}`}>
+          <thead><tr><th>Rank</th><th>Strategy</th><th>Balance</th><th>Return</th><th>Since Dawn</th><th>Trades</th></tr></thead>
+          <tbody>
+            {all.map((k, i) => {
+              const total = balanceChange(snap.strategies[k].daily.ref, start);
+              const dawn = official.strategies[k] ? balanceChange(official.strategies[k].daily.ref, start) : total;
+              const change = total - dawn;
+              return (
+                <tr key={k} className={k === maestroKey ? styles.maestroRow : undefined}>
+                  <td data-label="Rank" className="num">{i + 1}</td>
+                  <td data-label="Strategy"><span>{label(k)}</span>{k === maestroKey && <small>primary MAESTRO</small>}</td>
+                  <td data-label="Balance" className="num">{money(start + total, false)}</td>
+                  <td data-label="Return" className={`num ${total > 0.004 ? styles.gain : total < -0.004 ? styles.loss : styles.flat}`}>{money(total)}</td>
+                  <td data-label="Since Dawn" className={`num ${change > 0.004 ? styles.gain : change < -0.004 ? styles.loss : styles.flat}`}>{money(change)}</td>
+                  <td data-label="Trades" className="num">{snap.strategies[k].trades}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -240,7 +329,7 @@ function NotStarted() {
         <p className="lede">
           Every strategy will trade the euro against the dollar with £10,000 of pretend money at live
           prices, against a forecast of what should happen written down before it starts. This page
-          updates every night once the trial is running.
+          publishes Dawn, Day and Dusk observations once the trial is running.
         </p>
       </header>
     </div>
@@ -284,7 +373,8 @@ export default async function LivePage() {
           <p className="lede">
             On {longDate(snap.start)} each strategy got <strong>£10,000 of pretend money</strong>. Every five
             minutes, each one decides whether to bet on the euro rising or falling against the dollar, at
-            real prices. Updated every night; last updated {longDate(snap.generated_at)}.
+            real prices. Published at Dawn, Day and Dusk; this {FOUNDATION[editionOf(snap)].label} observation
+            was recorded {longDate(snap.generated_at)} at {new Date(snap.generated_at).toISOString().slice(11, 16)} UTC.
           </p>
           {snap.phase === "shakedown" && (
             <p className={`panel ${styles.notice}`}>
@@ -300,11 +390,19 @@ export default async function LivePage() {
 
       <FoundationCycle snap={snap} />
 
+      <LiveSummary latest={snap} official={official} all={all} maestroKey={maestroKey} start={start} />
+
       <PeriodReturns latest={snap} official={official} strategy={maestroKey} start={start} />
+
+      <Leaderboard snap={snap} official={official} all={all} maestroKey={maestroKey} start={start} />
 
       {/* 1. Balances */}
       <section className={styles.section} aria-labelledby="balances">
-        <h2 id="balances" className="visually-hidden">Balances</h2>
+        <div className={styles.sectionHead}>
+          <p className={styles.eyebrow}>Fixed before launch</p>
+          <h2 id="balances">Preselected comparisons</h2>
+          <p className="lede">These four remain fixed throughout the trial so the headline view cannot follow whichever strategy happens to be winning.</p>
+        </div>
         <div className={styles.cards}>
           {featured.map((k) => {
             const s = snap.strategies[k];
@@ -321,7 +419,7 @@ export default async function LivePage() {
           })}
         </div>
         <details className={styles.more}>
-          <NumbersToggle />
+          <NumbersToggle show="Show full cost breakdown" hide="Hide full cost breakdown" />
           <div className={styles.moreBody}>
             <p>
               Every strategy, in pips (a pip is 0.0001 dollars per euro). Fees are charged at the
@@ -586,7 +684,7 @@ export default async function LivePage() {
           </p>
         </div>
         <ul className={`panel ${styles.facts}`}>
-          <li><span>Snapshots</span><a href={LIVE_REPO} target="_blank" rel="noreferrer">every night&rsquo;s data, never rewritten</a></li>
+          <li><span>Snapshots</span><a href={LIVE_REPO} target="_blank" rel="noreferrer">every published observation, never rewritten</a></li>
           <li><span>The forecast it&rsquo;s judged against</span><a href={`${REPO}/blob/main/web/src/data/live_expectations.json`} target="_blank" rel="noreferrer">written {longDate(EXPECT.created_at)}</a></li>
           <li><span>Code running now</span><a href={commitUrl(snap.code_commit)} target="_blank" rel="noreferrer" className="num">{snap.code_commit?.slice(0, 7) ?? "unknown"}</a></li>
           <li><span>MAESTRO&rsquo;s training data</span><span className="num">{snap.model.train_start?.slice(0, 10)} to {snap.model.train_end?.slice(0, 10)}</span></li>
