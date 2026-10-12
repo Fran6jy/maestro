@@ -33,6 +33,53 @@
   line-height: 1;
 }
 
+.heroFacts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--line);
+}
+
+.heroFacts > span {
+  min-width: 0;
+  padding: 13px 14px;
+  display: grid;
+  gap: 4px;
+  background: var(--panel);
+}
+
+.heroFacts small {
+  color: var(--ink-2);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.heroFacts strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.heroActions > span {
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+
 .heroChart {
   min-width: 0;
 }
@@ -893,4 +940,294 @@
 
 .flat {
   color: var(--ink-2);
+}
+
+/* ── Editorial comparison ─────────────────────────────── */
+.comparison,
+.findings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.windowTabs {
+  width: fit-content;
+  padding: 4px;
+  display: flex;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+}
+
+.windowTabs a {
+  min-height: 40px;
+  padding: 9px 16px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.windowTabs a:hover,
+.windowTabs a:focus-visible,
+.windowTabs .windowActive {
+  color: var(--ink);
+  background: var(--panel-2);
+}
+
+.windowTabs .windowActive {
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.barChart {
+  padding: clamp(20px, 3vw, 32px);
+}
+
+.barChartTitle {
+  margin-bottom: 18px;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.barChartTitle span {
+  margin-left: 8px;
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 400;
+}
+
+.barRow {
+  display: grid;
+  grid-template-columns: minmax(210px, 1.1fr) minmax(260px, 2fr) 90px;
+  gap: 18px;
+  align-items: center;
+  min-height: 54px;
+  border-top: 1px solid var(--line);
+}
+
+.barLabel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-sm);
+}
+
+.barLabel span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barLabel small {
+  color: var(--accent);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.barTrack {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(141, 180, 255, 0.07);
+}
+
+.barZero {
+  position: absolute;
+  inset-block: -4px;
+  left: 50%;
+  width: 1px;
+  background: var(--line-2);
+}
+
+.barGain,
+.barLoss {
+  position: absolute;
+  top: 1px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.barGain {
+  left: 50%;
+  background: var(--gain);
+}
+
+.barLoss {
+  right: 50%;
+  background: var(--loss);
+}
+
+.barRow > strong {
+  text-align: right;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+
+.primaryBarRow .barLabel span {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.comparisonNote {
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+
+.findingGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px solid var(--line);
+}
+
+.findingGrid article {
+  padding: 28px clamp(18px, 3vw, 34px);
+}
+
+.findingGrid article + article {
+  border-left: 1px solid var(--line);
+}
+
+.findingGrid article > span {
+  color: var(--accent);
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--fs-xs);
+}
+
+.findingGrid h3 {
+  margin: 12px 0 10px;
+  font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-size: var(--fs-lg);
+  font-stretch: 86%;
+  line-height: 1.05;
+}
+
+.findingGrid p {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+
+/* ── Progressive research record ──────────────────────── */
+.researchRecord {
+  border-block: 1px solid var(--line);
+}
+
+.researchRecord > summary {
+  min-height: 110px;
+  padding: 24px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.researchRecord > summary::-webkit-details-marker {
+  display: none;
+}
+
+.researchRecord > summary > span:first-child {
+  display: grid;
+  gap: 5px;
+  font-family: var(--font-display), "Arial Narrow", sans-serif;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+.researchRecord > summary small {
+  color: var(--ink-2);
+  font-family: var(--font-body), sans-serif;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.recordAction {
+  min-height: 44px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--amber);
+  font-size: var(--fs-sm);
+}
+
+.researchRecord[open] .recordAction::before {
+  content: "Close details";
+  font-size: var(--fs-sm);
+}
+
+.researchRecord[open] .recordAction {
+  font-size: 0;
+}
+
+.researchBody {
+  padding: 24px 0 40px;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(48px, 6vw, 80px);
+}
+
+.researchRecord > summary:hover .recordAction,
+.researchRecord > summary:focus-visible .recordAction {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+}
+
+@media (max-width: 760px) {
+  .heroFacts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .barRow {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    gap: 8px 12px;
+    padding-block: 12px;
+  }
+
+  .barTrack {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .barRow > strong {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .findingGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .findingGrid article + article {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .windowTabs {
+    width: 100%;
+  }
+
+  .windowTabs a {
+    flex: 1;
+    justify-content: center;
+    padding-inline: 10px;
+  }
+
+  .researchRecord > summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
 }

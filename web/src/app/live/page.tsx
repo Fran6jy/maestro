@@ -8,7 +8,6 @@ import {
   LIVE_REPO,
   balanceChange,
   balancePath,
-  getOfficialSnapshot,
   getSnapshot,
   placement,
   trialDayNumber,
@@ -102,11 +101,6 @@ function mondayOf(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-function observationLabel(snap: Snapshot): string {
-  const edition = editionOf(snap);
-  return edition === "dawn" ? "Official Dawn close" : `${FOUNDATION[edition].label} observation`;
-}
-
 function nextObservation(snap: Snapshot): string {
   const edition = editionOf(snap);
   if (edition === "dawn") return "Day at 12:20 UTC";
@@ -138,43 +132,6 @@ function FoundationCycle({ snap }: { snap: Snapshot }) {
         Day and Dusk are observations while trading continues. Only Dawn becomes the official daily
         research record. This page checks for a newer observation every five minutes while open.
       </p>
-    </section>
-  );
-}
-
-function PeriodReturns({ latest, official, strategy, start }:
-  { latest: Snapshot; official: Snapshot; strategy: string; start: number }) {
-  const asOf = latest.generated_at.slice(0, 10);
-  const week = mondayOf(asOf);
-  const month = asOf.slice(0, 7);
-  const todayLog = latest.days.at(-1) === asOf
-    ? (latest.strategies[strategy]?.daily.ref.at(-1) ?? 0) : 0;
-  const values = [
-    ["Today", periodMoney(todayLog, start), latest.official === false ? "provisional" : "not started"],
-    ["This week", periodMoney(sumPeriod(official, strategy, (d) => d >= week && d <= asOf), start), "Dawn closes"],
-    ["This month", periodMoney(sumPeriod(official, strategy, (d) => d.startsWith(month)), start), "Dawn closes"],
-    ["All time", periodMoney(sumPeriod(official, strategy, () => true), start), "Dawn closes"],
-  ] as const;
-  return (
-    <section className={styles.periodSection} aria-labelledby="returns-period">
-      <div className={styles.sectionHead}>
-        <h2 id="returns-period">Returns through four windows</h2>
-        <p className="lede">
-          {label(strategy)}. Today follows the latest observation; week, month and all time use only
-          immutable Dawn closes.
-        </p>
-      </div>
-      <div className={styles.periodCards}>
-        {values.map(([name, value, basis]) => (
-          <div className={`panel ${styles.periodCard}`} key={name}>
-            <p>{name}</p>
-            <strong className={value > 0.004 ? styles.gain : value < -0.004 ? styles.loss : styles.flat}>
-              {money(value)}
-            </strong>
-            <small>{basis}</small>
-          </div>
-        ))}
-      </div>
     </section>
   );
 }
@@ -245,76 +202,91 @@ function NumbersToggle({ show = "Show the numbers", hide = "Hide the numbers" }:
   );
 }
 
-function LiveSummary({ latest, official, all, maestroKey, start }:
-  { latest: Snapshot; official: Snapshot; all: string[]; maestroKey: string; start: number }) {
-  const leader = all.find((k) => latest.strategies[k].trades > 0) ?? all[0];
-  const maestroRank = Math.max(1, all.indexOf(maestroKey) + 1);
-  const maestroNow = balanceChange(latest.strategies[maestroKey].daily.ref, start);
-  const maestroDawn = official.strategies[maestroKey]
-    ? balanceChange(official.strategies[maestroKey].daily.ref, start) : maestroNow;
-  const sinceDawn = maestroNow - maestroDawn;
-  const leaderReturn = balanceChange(latest.strategies[leader].daily.ref, start);
+type ViewWindow = "today" | "week" | "all";
+
+function viewReturn(snap: Snapshot, key: string, view: ViewWindow, start: number): number {
+  const asOf = snap.generated_at.slice(0, 10);
+  const keep = view === "today"
+    ? (day: string) => day === asOf
+    : view === "week"
+      ? (day: string) => day >= mondayOf(asOf) && day <= asOf
+      : () => true;
+  return periodMoney(sumPeriod(snap, key, keep), start);
+}
+
+function StrategyComparison({ snap, all, maestroKey, start, view }:
+  { snap: Snapshot; all: string[]; maestroKey: string; start: number; view: ViewWindow }) {
+  const rows = all
+    .map((key) => ({ key, value: viewReturn(snap, key, view, start) }))
+    .sort((a, b) => b.value - a.value);
+  const scale = Math.max(...rows.map((row) => Math.abs(row.value)), 1);
+  const title = view === "today" ? "Today" : view === "week" ? "This week" : "Entire trial";
   return (
-    <section className={styles.liveSummary} aria-labelledby="right-now">
-      <div className={styles.summaryHeading}>
-        <div>
-          <p className={styles.eyebrow}>Right now</p>
-          <h2 id="right-now">The trial at a glance</h2>
-        </div>
-        <p>{observationLabel(latest)} · {new Date(latest.generated_at).toISOString().slice(11, 16)} UTC</p>
+    <section className={styles.comparison} id="comparison" aria-labelledby="comparison-title">
+      <div className={styles.sectionHead}>
+        <p className={styles.eyebrow}>One fair comparison</p>
+        <h2 id="comparison-title">How every strategy compares</h2>
+        <p className="lede">Returns after the same reference trading fee. Select a period to change the comparison.</p>
       </div>
-      <div className={styles.summaryGrid}>
-        <div className={`panel ${styles.summaryCard}`}>
-          <span>Leading active strategy</span><strong>{label(leader)}</strong>
-          <small className={leaderReturn >= 0 ? styles.gain : styles.loss}>{money(leaderReturn)}</small>
-        </div>
-        <div className={`panel ${styles.summaryCard}`}>
-          <span>MAESTRO rank</span><strong>#{maestroRank} of {all.length}</strong>
-          <small>{money(maestroNow)} after fees</small>
-        </div>
-        <div className={`panel ${styles.summaryCard}`}>
-          <span>MAESTRO since Dawn</span><strong className={sinceDawn > 0.004 ? styles.gain : sinceDawn < -0.004 ? styles.loss : styles.flat}>{money(sinceDawn)}</strong>
-          <small>{latest.strategies[maestroKey].trades} trades in total</small>
-        </div>
-        <div className={`panel ${styles.summaryCard}`}>
-          <span>Next publication</span><strong>{nextObservation(latest)}</strong>
-          <small>Page checks every five minutes</small>
-        </div>
+      <nav className={styles.windowTabs} aria-label="Comparison period">
+        {(["today", "week", "all"] as const).map((item) => (
+          <Link key={item} href={`/live?window=${item}#comparison`}
+            className={item === view ? styles.windowActive : undefined}
+            aria-current={item === view ? "page" : undefined}>
+            {item === "today" ? "Today" : item === "week" ? "This week" : "Entire trial"}
+          </Link>
+        ))}
+      </nav>
+      <div className={`panel ${styles.barChart}`} role="img" aria-label={`${title} strategy returns after fees`}>
+        <p className={styles.barChartTitle}>{title} <span>£10,000 starting balance</span></p>
+        {rows.map(({ key, value }, index) => (
+          <div className={`${styles.barRow} ${key === maestroKey ? styles.primaryBarRow : ""}`} key={key}>
+            <div className={styles.barLabel}>
+              <span>{index + 1}. {label(key)}</span>
+              {key === maestroKey && <small>Primary MAESTRO</small>}
+            </div>
+            <div className={styles.barTrack} aria-hidden="true">
+              <span className={styles.barZero} />
+              <span className={value >= 0 ? styles.barGain : styles.barLoss}
+                style={{ width: `${Math.max(1, Math.abs(value) / scale * 50)}%` }} />
+            </div>
+            <strong className={value > 0.004 ? styles.gain : value < -0.004 ? styles.loss : styles.flat}>{money(value)}</strong>
+          </div>
+        ))}
       </div>
+      <p className={styles.comparisonNote}>A strategy with no trades remains visible, but is not treated as evidence of successful trading.</p>
     </section>
   );
 }
 
-function Leaderboard({ snap, official, all, maestroKey, start }:
-  { snap: Snapshot; official: Snapshot; all: string[]; maestroKey: string; start: number }) {
+function Findings({ snap, maestroKey, start }:
+  { snap: Snapshot; maestroKey: string; start: number }) {
+  const primary = snap.strategies[maestroKey];
+  const ungated = snap.strategies.maestro_ungated;
+  const primaryNet = balanceChange(primary.daily.ref, start);
+  const primaryGross = balanceChange(primary.daily.gross, start);
+  const fees = primaryGross - primaryNet;
+  const coverage = snap.health.bars_expected
+    ? ((snap.health.bars_recorded ?? 0) / snap.health.bars_expected) * 100 : 0;
   return (
-    <section className={styles.section} aria-labelledby="leaderboard">
+    <section className={styles.findings} aria-labelledby="findings-title">
       <div className={styles.sectionHead}>
-        <p className={styles.eyebrow}>Every strategy</p>
-        <h2 id="leaderboard">Live leaderboard</h2>
-        <p className="lede">All strategies, ranked by return after the same reference fee. Strategies with no trades remain visible, but are not described as active leaders.</p>
+        <p className={styles.eyebrow}>What the evidence says</p>
+        <h2 id="findings-title">Three things we are learning</h2>
       </div>
-      <div className={`panel ${styles.leaderboardWrap}`}>
-        <table className={`${styles.table} ${styles.leaderboardTable}`}>
-          <thead><tr><th>Rank</th><th>Strategy</th><th>Balance</th><th>Return</th><th>Since Dawn</th><th>Trades</th></tr></thead>
-          <tbody>
-            {all.map((k, i) => {
-              const total = balanceChange(snap.strategies[k].daily.ref, start);
-              const dawn = official.strategies[k] ? balanceChange(official.strategies[k].daily.ref, start) : total;
-              const change = total - dawn;
-              return (
-                <tr key={k} className={k === maestroKey ? styles.maestroRow : undefined}>
-                  <td data-label="Rank" className="num">{i + 1}</td>
-                  <td data-label="Strategy"><span>{label(k)}</span>{k === maestroKey && <small>primary MAESTRO</small>}</td>
-                  <td data-label="Balance" className="num">{money(start + total, false)}</td>
-                  <td data-label="Return" className={`num ${total > 0.004 ? styles.gain : total < -0.004 ? styles.loss : styles.flat}`}>{money(total)}</td>
-                  <td data-label="Since Dawn" className={`num ${change > 0.004 ? styles.gain : change < -0.004 ? styles.loss : styles.flat}`}>{money(change)}</td>
-                  <td data-label="Trades" className="num">{snap.strategies[k].trades}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className={styles.findingGrid}>
+        <article>
+          <span>01</span><h3>Confidence is not helping yet</h3>
+          <p>The most-confident strategy is {money(primaryNet)} after {primary.trades} trades, while every signal is {money(balanceChange(ungated.daily.ref, start))}.</p>
+        </article>
+        <article>
+          <span>02</span><h3>Small edges are paying real costs</h3>
+          <p>MAESTRO&rsquo;s primary strategy has given up {money(Math.max(0, fees), false)} to the reference fee. More frequent strategies pay considerably more.</p>
+        </article>
+        <article>
+          <span>03</span><h3>The experiment itself is reliable</h3>
+          <p>{coverage.toFixed(1)}% of expected market bars have been recorded. The technology is working even though profitability is not established.</p>
+        </article>
       </div>
     </section>
   );
@@ -336,17 +308,22 @@ function NotStarted() {
   );
 }
 
-export default async function LivePage() {
+export default async function LivePage({ searchParams }:
+  { searchParams?: Promise<{ window?: string }> }) {
   if (!LIVE_PUBLIC && !process.env.LIVE_SNAPSHOT_FILE) notFound();
-  const [snap, officialLoaded] = await Promise.all([getSnapshot(), getOfficialSnapshot()]);
+  const snap = await getSnapshot();
   if (!snap || !snap.start || !snap.days.length) return <NotStarted />;
-  const official = officialLoaded ?? snap;
+  const params = await searchParams;
+  const view: ViewWindow = params?.window === "today" || params?.window === "week" ? params.window : "all";
 
   const start = snap.start_gbp ?? EXPECT.start_balance;
   const maestroKey = snap.order_strategy ?? DEFAULT_MAESTRO;
   const featured = [maestroKey, ...OTHERS.filter((k) => k !== maestroKey)].filter((k) => snap.strategies[k]).slice(0, 4);
   const all = Object.keys(snap.strategies).sort((a, b) =>
     balanceChange(snap.strategies[b].daily.ref, start) - balanceChange(snap.strategies[a].daily.ref, start));
+  const active = all.filter((k) => snap.strategies[k].trades > 0);
+  const primaryRank = active.indexOf(maestroKey) + 1;
+  const primaryReturn = balanceChange(snap.strategies[maestroKey].daily.ref, start);
   const n = snap.days.length;
   const trialDay = trialDayNumber(snap);
   const dayIdx = Math.min(n, EXPECT.horizon_days) - 1;
@@ -365,17 +342,24 @@ export default async function LivePage() {
       <header className={styles.hero}>
         <div className={styles.heroText}>
           <div className={styles.headTop}>
-                <span className={`pill ${snap.phase === "trial" ? "pill-done" : "pill-next"}`}>
+            <span className={`pill ${snap.phase === "trial" ? "pill-done" : "pill-next"}`}>
               {snap.phase === "trial" ? "Running" : "Shakedown"}
             </span>
           </div>
-          <h1>Day {trialDay}: where the pretend money stands</h1>
+          <h1>After {trialDay} days, MAESTRO is {money(primaryReturn)}</h1>
           <p className="lede">
-            On {longDate(snap.start)} each strategy got <strong>£10,000 of pretend money</strong>. Every five
-            minutes, each one decides whether to bet on the euro rising or falling against the dollar, at
-            real prices. Published at Dawn, Day and Dusk; this {FOUNDATION[editionOf(snap)].label} observation
-            was recorded {longDate(snap.generated_at)} at {new Date(snap.generated_at).toISOString().slice(11, 16)} UTC.
+            The system is operating reliably, but its predicted advantage has not yet produced a profit.
+            The primary strategy ranks <strong>{primaryRank} of {active.length} active strategies</strong> after fees.
           </p>
+          <div className={styles.heroFacts}>
+            <span><small>Current balance</small><strong>{money(start + primaryReturn, false)}</strong></span>
+            <span><small>Trades</small><strong>{snap.strategies[maestroKey].trades}</strong></span>
+            <span><small>Latest record</small><strong>{FOUNDATION[editionOf(snap)].label} · {new Date(snap.generated_at).toISOString().slice(11, 16)} UTC</strong></span>
+          </div>
+          <div className={styles.heroActions}>
+            <LiveRefresh />
+            <span>Next: {nextObservation(snap)}</span>
+          </div>
           {snap.phase === "shakedown" && (
             <p className={`panel ${styles.notice}`}>
               This is a shakedown: the setup is being tested before the trial proper, which starts after
@@ -388,13 +372,17 @@ export default async function LivePage() {
         </div>
       </header>
 
-      <FoundationCycle snap={snap} />
+      <StrategyComparison snap={snap} all={all} maestroKey={maestroKey} start={start} view={view} />
 
-      <LiveSummary latest={snap} official={official} all={all} maestroKey={maestroKey} start={start} />
+      <Findings snap={snap} maestroKey={maestroKey} start={start} />
 
-      <PeriodReturns latest={snap} official={official} strategy={maestroKey} start={start} />
-
-      <Leaderboard snap={snap} official={official} all={all} maestroKey={maestroKey} start={start} />
+      <details className={styles.researchRecord}>
+        <summary>
+          <span><small>For researchers and auditors</small>Explore the full research record</span>
+          <span className={styles.recordAction}>Open details</span>
+        </summary>
+        <div className={styles.researchBody}>
+          <FoundationCycle snap={snap} />
 
       {/* 1. Balances */}
       <section className={styles.section} aria-labelledby="balances">
@@ -693,6 +681,8 @@ export default async function LivePage() {
         </ul>
         <p className={styles.small}>Pretend money and an OANDA practice account only. Nothing here is investment advice.</p>
       </section>
+        </div>
+      </details>
     </div>
   );
 }
