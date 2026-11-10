@@ -25,15 +25,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from maestro.live.schedule import PUBLISH_SLOTS
 from maestro.live.snapshot import build
 
 logger = logging.getLogger(__name__)
 
-PUBLISH_SLOTS = {
-    "dawn": pd.Timedelta(minutes=20),
-    "day": pd.Timedelta(hours=12, minutes=20),
-    "dusk": pd.Timedelta(hours=20, minutes=20),
-}
 AUTHOR = ("Fran6jy", "30803931+Fran6jy@users.noreply.github.com")
 
 

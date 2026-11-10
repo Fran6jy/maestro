@@ -118,12 +118,32 @@ def test_snapshot_never_carries_prices(state):
     assert '"mid"' not in text and '"price"' not in text and '"bid"' not in text
 
 
+@pytest.mark.parametrize(("published", "checked", "overdue"), [
+    ("2026-11-10 00:20", "2026-11-10 10:34", False),
+    ("2026-11-10 00:20", "2026-11-10 13:19", False),
+    ("2026-11-10 00:20", "2026-11-10 13:20", True),
+    ("2026-11-10 12:20", "2026-11-10 13:20", False),
+    ("2026-11-10 12:20", "2026-11-10 21:20", True),
+    ("2026-11-09 20:20", "2026-11-10 01:19", False),
+    ("2026-11-09 20:20", "2026-11-10 01:20", True),
+])
+def test_check_allows_each_publish_slot_its_grace_period(published, checked, overdue):
+    at = pd.Timestamp(published, tz="UTC").isoformat()
+    snap = {"generated_at": at, "heartbeat": {"at": at}}
+    found = problems(snap, pd.Timestamp(checked, tz="UTC"))
+    if overdue:
+        assert len(found) == 1
+        assert found[0].startswith("snapshot is stale")
+    else:
+        assert found == []
+
+
 def test_check_flags_a_stopped_loop_and_a_stale_snapshot(state):
     path, close, _ = state
     now = close.index[-1] + pd.Timedelta(minutes=6)
     snap = build(path, "trial", now=now)
     assert problems(snap, now) == []
-    assert any("stopped" in p for p in problems(snap, now + pd.Timedelta(hours=30)))
+    assert any("snapshot is stale" in p for p in problems(snap, now + pd.Timedelta(hours=30)))
     snap["heartbeat"]["at"] = str(now - pd.Timedelta(hours=2))
     assert any("loop has stopped" in p for p in problems(snap, now))
     snap["heartbeat"] = {"at": str(now), "error": "ValueError: boom"}

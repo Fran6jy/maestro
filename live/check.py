@@ -4,7 +4,7 @@ maestro/live/check.py
 Fails (exit code 1) if the published snapshot says the live trial is unwell, so a
 scheduled GitHub Action that runs it emails the owner.
 
-Unwell means: the snapshot itself is stale (the VM or the publisher stopped), the
+Unwell means: a scheduled snapshot is overdue, the
 loop's heartbeat was stale when the snapshot was taken (the loop stopped), the loop
 reported an error other than the market being closed, or it missed bars.
 
@@ -20,8 +20,9 @@ from pathlib import Path
 import pandas as pd
 
 from maestro.data.pipeline.store import market_closed
+from maestro.live.schedule import PUBLISH_SLOTS
 
-MAX_SNAPSHOT_AGE = pd.Timedelta(hours=10)    # Foundation editions are at most eight hours apart
+PUBLISH_GRACE = pd.Timedelta(hours=1)
 MAX_HEARTBEAT_AGE = pd.Timedelta(minutes=30)
 MAX_MISSED_SHARE = 0.02
 
@@ -29,8 +30,15 @@ MAX_MISSED_SHARE = 0.02
 def problems(snap: dict, now: pd.Timestamp) -> list[str]:
     out = []
     at = pd.Timestamp(snap["generated_at"])
-    if now - at > MAX_SNAPSHOT_AGE:
-        out.append(f"snapshot is {(now - at) / pd.Timedelta(hours=1):.0f} h old: the VM or the publisher has stopped")
+    due_by = now - PUBLISH_GRACE
+    midnight = due_by.normalize()
+    latest_slot = max(
+        (midnight + offset for offset in PUBLISH_SLOTS.values() if offset <= due_by - midnight),
+        default=midnight - pd.Timedelta(days=1) + PUBLISH_SLOTS["dusk"],
+    )
+    if at < latest_slot:
+        out.append(f"snapshot is stale: expected a publication at or after {latest_slot.isoformat()}, "
+                   f"latest snapshot was generated at {at.isoformat()}")
     hb = snap.get("heartbeat") or {}
     if not hb.get("at"):
         out.append("no heartbeat: the loop has never completed a cycle")
